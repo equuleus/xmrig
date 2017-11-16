@@ -1,70 +1,57 @@
 @ECHO OFF
-REM RUN EXAMPLES:
-REM	xmrig-proxy.cmd
-REM	xmrig-proxy.cmd MONERO
-REM	xmrig-proxy.cmd SUMOKOIN
 SETLOCAL ENABLEEXTENSIONS
 CLS
-TITLE XMRig Proxy
+TITLE XMRig
 
-SET POOL_MONERO=pool.monero.hashvault.pro
-SET PORT_MONERO=5555
-SET WALLET_MONERO=4...
-
-SET POOL_SUMOKOIN=pool.sumokoin.hashvault.pro
-SET PORT_SUMOKOIN=5555
-SET WALLET_SUMOKOIN=Sumo...
-
-SET POOL_DEFAULT=%POOL_MONERO%
-SET PORT_DEFAULT=%PORT_MONERO%
-SET WALLET_DEFAULT=%WALLET_MONERO%
-
-SET DIFF=2000
-SET ID=PROXY
+SET URL=pool.monero.hashvault.pro
+SET PORT=5555
+SET WALLET=4...
+SET DIFF=10000
+SET ID=%COMPUTERNAME%
 SET EMAIL=user@server.com
-SET PROXY_ADDRESS=0.0.0.0
-SET PROXY_PORT=5555
 
 SET ALLOW_MANUAL_SELECT=true
 
 SET SRC=%~dp0
-SET PROGRAM_TITLE=XMRig Proxy
+SET PROGRAM_TITLE=XMRig
 SET PROGRAM_PATH=%SRC:~0,-1%
-SET PROGRAM_FILENAME=xmrig-proxy.exe
+SET PROGRAM_CPU_FILENAME=xmrig.exe
+SET PROGRAM_GPU_FILENAME=xmrig-nvidia.exe
+SET PROGRAM_PARAMETERS=--algo=cryptonight --url=%URL%:%PORT% --keepalive --retries=5 --retry-pause=5 --donate-level=1 --nicehash 
+SET PROGRAM_CPU_PARAMETERS=--av=1 --threads=4 --cpu-affinity=0xAA
+SET PROGRAM_GPU_PARAMETERS=--cuda-devices=0 --cuda-launch=16x4 --cuda-bfactor=6 --cuda-bsleep=50
 
-SET CSCRIPT=%SystemRoot%\System32\cscript.exe
-SET TASKLIST=%SystemRoot%\System32\tasklist.exe
 SET TASKKILL=%SystemRoot%\System32\taskkill.exe
+SET TASKLIST=%SystemRoot%\System32\tasklist.exe
+SET CSCRIPT=%SystemRoot%\System32\cscript.exe
 
 IF "%1" EQU "ELEVATE" (
-	CALL :SELECT %2
+	CALL :SELECT %2 %3
 ) ELSE (
-	CALL :SELECT %1
+	CALL :SELECT %1 %2
+)
+IF "%PARAMETER%" EQU "CPU" (
+	SET PROGRAM_PATH=%PROGRAM_PATH%\CPU
+	SET PROGRAM_FILENAME=%PROGRAM_CPU_FILENAME%
+	SET PROGRAM_PARAMETERS=%PROGRAM_PARAMETERS% %PROGRAM_CPU_PARAMETERS%
+)
+IF "%PARAMETER%" EQU "GPU" (
+	SET PROGRAM_PATH=%PROGRAM_PATH%\GPU
+	SET PROGRAM_FILENAME=%PROGRAM_GPU_FILENAME%
+	SET PROGRAM_PARAMETERS=%PROGRAM_PARAMETERS% %PROGRAM_GPU_PARAMETERS%
 )
 CLS
-
-SET PROGRAM_PARAMETERS=--url=%POOL%:%PORT% --user=%WALLET%+%DIFF% --pass=%ID%:%EMAIL% --keepalive --bind %PROXY_ADDRESS%:%PROXY_PORT%
-
+IF "%PROGRAM_FILENAME%" EQU "" GOTO END
 IF EXIST "%PROGRAM_PATH%\%PROGRAM_FILENAME%" (
 	IF EXIST "%CSCRIPT%" (
 		IF "%1" EQU "ELEVATE" (
-			CALL :TEST "ELEVATE" "%2"
+			CALL :TEST "ELEVATE" "%PARAMETER%" "%ACTION%"
 		) ELSE (
-			IF "%1" EQU "MONERO" (
-				CALL :TEST "NONE" "%1"
-			) ELSE IF "%1" EQU "SUMOKOIN" (
-				CALL :TEST "NONE" "%1"
-			) ELSE (
-				IF "%COIN%" EQU "1" (
-					CALL :TEST "NONE" "MONERO"
-				) ELSE IF "%COIN%" EQU "2" (
-					CALL :TEST "NONE" "SUMOKOIN"
-				) ELSE (
-					GOTO END
-				)
-			)
+			CALL :TEST "NONE" "%PARAMETER%" "%ACTION%"
 		)
 	) ELSE (
+		ECHO.
+		ECHO ERROR: Can not find "%CSCRIPT%".
 		CALL :START
 	)
 )
@@ -72,41 +59,48 @@ GOTO END
 
 :SELECT
 	IF "%~1" NEQ "" (
-		IF "%~1" EQU "MONERO" (
-			SET POOL=%POOL_MONERO%
-			SET PORT=%PORT_MONERO%
-			SET WALLET=%WALLET_MONERO%
-		) ELSE IF "%~1" EQU "SUMOKOIN" (
-			SET POOL=%POOL_SUMOKOIN%
-			SET PORT=%PORT_SUMOKOIN%
-			SET WALLET=%WALLET_SUMOKOIN%
-		) ELSE (
-			SET POOL=%POOL_DEFAULT%
-			SET PORT=%PORT_DEFAULT%
-			SET WALLET=%WALLET_DEFAULT%
-		)
-		GOTO END
-	) ELSE (
-		IF "%ALLOW_MANUAL_SELECT%" EQU "true" (
-			SET /P COIN="Please select a coin [Monero/Sumokoin] [1/2]: "
-		) ELSE (
-			SET POOL=%POOL_DEFAULT%
-			SET PORT=%PORT_DEFAULT%
-			SET WALLET=%WALLET_DEFAULT%
-			GOTO END
+		IF "%~1" EQU "CPU" (
+			SET PARAMETER=CPU
+		) ELSE IF "%~1" EQU "GPU" (
+			SET PARAMETER=GPU
+		) ELSE IF "%~1" EQU "START" (
+			SET ACTION=START
+		) ELSE IF "%~1" EQU "STOP" (
+			SET ACTION=STOP
 		)
 	)
-	IF "%~1" EQU "" (
-		IF "%ALLOW_MANUAL_SELECT%" EQU "true" (
-			IF "%COIN%" EQU "1" (
-				CALL :SELECT "MONERO"
-			) ELSE IF "%COIN%" EQU "2" (
-				CALL :SELECT "SUMOKOIN"
-			) ELSE (
-				ECHO Select is not correct. Please input "1" or "2". Try again...
-				ECHO.
-				GOTO :SELECT
-			)
+	IF "%~2" NEQ "" (
+		IF "%~2" EQU "CPU" (
+			SET PARAMETER=CPU
+		) ELSE IF "%~2" EQU "GPU" (
+			SET PARAMETER=GPU
+		) ELSE IF "%~2" EQU "START" (
+			SET ACTION=START
+		) ELSE IF "%~2" EQU "STOP" (
+			SET ACTION=STOP
+		)
+	)
+	IF "%ALLOW_MANUAL_SELECT%" NEQ "true" GOTO END
+	IF "%PARAMETER%" EQU "" (
+		SET /P PARAMETER="Please select a program [CPU/GPU]: "
+	)
+	IF "%PARAMETER%" NEQ "CPU" (
+		IF "%PARAMETER%" NEQ "GPU" (
+			SET PARAMETER=
+			ECHO Select is not correct. Please input "CPU" or "GPU". Try again...
+			ECHO.
+			GOTO :SELECT
+		)
+	)
+	IF "%ACTION%" EQU "" (
+		SET /P ACTION="Please select an action [START/STOP]: "
+	)
+	IF "%ACTION%" NEQ "START" (
+		IF "%ACTION%" NEQ "STOP" (
+			SET ACTION=
+			ECHO Select is not correct. Please input "START" or "STOP". Try again...
+			ECHO.
+			GOTO :SELECT "%PARAMETER%"
 		)
 	)
 GOTO END
@@ -126,19 +120,26 @@ GOTO END
 			IF EXIST "%TASKLIST%" (
 				IF EXIST "%TASKKILL%" CALL :START
 			)
-			CALL :ELEVATE %~2
+			CALL :ELEVATE %~2 %~3
 		)
 	)
 GOTO END
 
 :ELEVATE
-	ECHO CreateObject^("Shell.Application"^).ShellExecute "%~snx0","ELEVATE %~1","%~sdp0","runas","%PROGRAM_TITLE%">"%TEMP%\%PROGRAM_FILENAME%.vbs"
-	%CSCRIPT% //nologo "%TEMP%\%PROGRAM_FILENAME%.vbs"
-	IF EXIST "%TEMP%\%PROGRAM_FILENAME%.vbs" DEL "%TEMP%\%PROGRAM_FILENAME%.vbs"
+	ECHO CreateObject^("Shell.Application"^).ShellExecute "%~snx0","ELEVATE %~1 %~2","%~sdp0","runas","%PROGRAM_TITLE%">"%TEMP%\%~n0.vbs"
+	%CSCRIPT% //nologo "%TEMP%\%~n0.vbs"
+	IF EXIST "%TEMP%\%~n0.vbs" DEL "%TEMP%\%~n0.vbs"
 GOTO END
+
 
 :START
 	CALL :CHECK
+	IF "%ACTION%" EQU "STOP" GOTO END
+	SET USER=%WALLET%
+	IF "%DIFF%" NEQ "" SET USER=%USER%+%DIFF%
+	SET PASSWORD=%ID%-%PARAMETER%
+	IF "%EMAIL%" NEQ "" SET PASSWORD=%PASSWORD%:%EMAIL%
+	SET PROGRAM_PARAMETERS=--user=%USER% --pass=%PASSWORD% %PROGRAM_PARAMETERS%
 	CD "%PROGRAM_PATH%"
 	IF "%~1" EQU "ELEVATE" (
 		CALL "%PROGRAM_PATH%\%PROGRAM_FILENAME%" %PROGRAM_PARAMETERS%
@@ -150,10 +151,16 @@ GOTO END
 :CHECK
 	IF EXIST "%TASKLIST%" (
 		FOR /F "tokens=2 delims=," %%A IN ('%TASKLIST% /FI "ImageName EQ %PROGRAM_FILENAME%" /FO:CSV /NH^| FIND /I "%PROGRAM_FILENAME%"') DO SET TASK_PID=%%~A
+	) ELSE (
+		ECHO.
+		ECHO ERROR: Can not find "%TASKLIST%".
 	)
 	IF "%TASK_PID%" NEQ "" (
 		IF EXIST "%TASKKILL%" (
 			%TASKKILL% /F /IM "%PROGRAM_FILENAME%">NUL
+		) ELSE (
+			ECHO.
+			ECHO ERROR: Can not find "%TASKKILL%".
 		)
 	)
 GOTO END
