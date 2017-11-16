@@ -1,12 +1,11 @@
-# xmrig-proxy.cmd
-Windows Batch Script for automated start XMRig Proxy (https://github.com/xmrig/xmrig-proxy) with parameters
+# xmrig.cmd
+Windows Batch Script for automated start XMRig and XMRig NVIDIA (https://github.com/xmrig/xmrig & https://github.com/xmrig/xmrig-nvidia) with parameters
 
-Run with available parameters: "xmrig-proxy.cmd MONERO" or "xmrig-proxy.cmd SUMOKOIN". If you run it without any params (and "ALLOW_MANUAL_SELECT" set to "true") you can manually select what ever you want to run.
+Run with available parameters: "xmrig.cmd CPU START", "xmrig.cmd CPU STOP", "xmrig-proxy.cmd GPU START", "xmrig.cmd GPU STOP". 
+If you run it without any params (and "ALLOW_MANUAL_SELECT" set to "true") you can manually select what ever you want to run.
 
-If parameter not set, will use a default setting (MONERO).
+If miner ("xmrig.exe" or "xmrig-nvidia.exe" file) already started, it will be automatically closed (killed process).
 
-If proxy ("xmrig-proxy.exe" file) already started, it will be automatically closed (killed process).
-
-Don't forget to change "WALLET_MONERO" ("WALLET_SUMOKOIN") in a CMD to your personal wallets and other params at your choice. Good luck!
+Don't forget to put exe files to "CPU" and "GPU" folders and change "WALLET", "DIFF", "ID", "EMAIL", "PROGRAM_CPU_PARAMETERS" and "PROGRAM_GPU_PARAMETERS" in a CMD to your personal settings at your choice. Good luck!
 
 No one known bug currently.
