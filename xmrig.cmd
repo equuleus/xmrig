@@ -42,7 +42,7 @@ SET PROGRAM_PATH=%SRC:~0,-1%
 SET PROGRAM_CPU_FILENAME=xmrig.exe
 SET PROGRAM_NVIDIA_FILENAME=xmrig-nvidia.exe
 SET PROGRAM_AMD_FILENAME=xmrig-amd.exe
-SET PROGRAM_PS_FILENAME=XMRig.ps1
+SET PROGRAM_PS_FILENAME=xmrig.ps1
 rem SET PROGRAM_PS_START=C:\Windows\System32\WindowsPowershell\v1.0\powershell.exe -executionpolicy unrestricted -file "%PROGRAM_PATH%\%PROGRAM_PS_FILENAME%"
 SET PROGRAM_PS_START=C:\Windows\System32\WindowsPowershell\v1.0\powershell.exe -executionpolicy unrestricted -windowstyle hidden -file "%PROGRAM_PATH%\%PROGRAM_PS_FILENAME%"
 
