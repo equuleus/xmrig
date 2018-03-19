@@ -31,5 +31,3 @@ File "xmrig.exe" to "CPU" folder (if you want to use "CPU"), file "xmrig-nvidia.
 
 Of course, change base parameters, stored in CMD-file, like: "WALLET", "ID", "EMAIL", "PROGRAM_CPU_PARAMETERS", "PROGRAM_NVIDIA_PARAMETERS", "PROGRAM_AMD_PARAMETERS", "PROGRAM_CPU_DIFF", "PROGRAM_NVIDIA_DIFF" and "PROGRAM_AMD_DIFF" in a CMD-file to your personal settings at your choice. Good luck!
 
-
-No one known bug currently.
