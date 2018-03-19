@@ -1,5 +1,5 @@
 # xmrig.cmd
-Windows Batch Script for automated elevating administartor permissions (VBScript) and start XMRig (https://github.com/xmrig/xmrig), XMRig NVIDIA (https://github.com/xmrig/xmrig-nvidia) or XMRig AMD (https://github.com/xmrig/xmrig-amd).
+Windows Batch Script for automated elevating administartor permissions (VBScript) and start XMRig (https://github.com/xmrig/xmrig), XMRig NVIDIA (https://github.com/xmrig/xmrig-nvidia) or XMRig AMD (https://github.com/xmrig/xmrig-amd) with GUI (based on XMRig API and PowerShell script).
 
 Silent start/stop with available parameters:
 
@@ -29,7 +29,7 @@ Don't forget to put exe files to subfolders:
 File "xmrig.exe" to "CPU" folder (if you want to use "CPU"), file "xmrig-nvidia.exe" to "NVIDIA" folder (if you want to use "NVIDIA") and "xmrig-amd.exe" to "AMD" folder (if you want to use "AMD").
 
 
-Of course, change "WALLET", "ID", "EMAIL", "PROGRAM_CPU_PARAMETERS", "PROGRAM_NVIDIA_PARAMETERS", "PROGRAM_AMD_PARAMETERS", "PROGRAM_CPU_DIFF", "PROGRAM_NVIDIA_DIFF" and "PROGRAM_AMD_DIFF" in a CMD-file to your personal settings at your choice. Good luck!
+Of course, change base parameters, stored in CMD-file, like: "WALLET", "ID", "EMAIL", "PROGRAM_CPU_PARAMETERS", "PROGRAM_NVIDIA_PARAMETERS", "PROGRAM_AMD_PARAMETERS", "PROGRAM_CPU_DIFF", "PROGRAM_NVIDIA_DIFF" and "PROGRAM_AMD_DIFF" in a CMD-file to your personal settings at your choice. Good luck!
 
 
 No one known bug currently.
