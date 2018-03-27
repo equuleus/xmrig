@@ -111,10 +111,12 @@ Function FormDimensions ($Content) {
 	$FormDimensions["objTabPageMonitorNVIDIAHorizontalPosition"] = $FormDimensions["objTabPageMonitorHorizontalPosition"]
 	$FormDimensions["objTabPageMonitorNVIDIAVerticalPosition"] = $FormDimensions["objTabPageMonitorCPUVerticalPosition"] + $FormDimensions["objTabPageMonitorCPUHeight"]
 	If ((GetType $Content) -eq "NVIDIA") {
+		$Script:FormFieldNVIDIAVisible = $True
 		If ($Content.health.Count -eq 1) {
 			$FormDimensions["objTabPageMonitorNVIDIAHeight"] = 60
 		}
 	} Else {
+		$Script:FormFieldNVIDIAVisible = $False
 		$FormDimensions["objTabPageMonitorNVIDIAHeight"] = 0
 	}
 
@@ -329,7 +331,11 @@ Function Show_Dialog ($address, $port, $token, $process, $refresh) {
 
 						$objTabPageSettingsGroupBoxInformation.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorInformationHorizontalPosition"],$FormDimensions["objTabPageMonitorInformationVerticalPosition"])
 						$objTabPageSettingsGroupBoxCPU.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorCPUHorizontalPosition"],$FormDimensions["objTabPageMonitorCPUVerticalPosition"])
-						$objTabPageSettingsGroupBoxNVIDIA.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorNVIDIAHorizontalPosition"],$FormDimensions["objTabPageMonitorNVIDIAVerticalPosition"])
+						If ((GetType $Content) -eq "NVIDIA") {
+							$objTabPageSettingsGroupBoxNVIDIA.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorNVIDIAHorizontalPosition"],$FormDimensions["objTabPageMonitorNVIDIAVerticalPosition"])
+							$objTabPageSettingsGroupBoxNVIDIA.Size = New-Object System.Drawing.Size($FormDimensions["objTabPageMonitorNVIDIAWidth"],$FormDimensions["objTabPageMonitorNVIDIAHeight"])
+							$objTabPageSettingsGroupBoxNVIDIAListView.Size = New-Object System.Drawing.Size(620,($FormDimensions["objTabPageMonitorNVIDIAHeight"] - 15))
+						}
 						$objTabPageSettingsGroupBoxConnection.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorConnectionHorizontalPosition"],$FormDimensions["objTabPageMonitorConnectionVerticalPosition"])
 						$objTabPageSettingsGroupBoxHashrate.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorHashrateHorizontalPosition"],$FormDimensions["objTabPageMonitorHashrateVerticalPosition"])
 						$objTabPageSettingsGroupBoxResults.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorResultsHorizontalPosition"],$FormDimensions["objTabPageMonitorResultsVerticalPosition"])
@@ -399,9 +405,9 @@ Function Show_Dialog ($address, $port, $token, $process, $refresh) {
 						$objTabPageSettingsGroupBoxCPUTextBoxSockets.Text = $Content.cpu.sockets
 					}
 
+					$objTabPageSettingsGroupBoxNVIDIAListView.Items.Clear()
 					If ($Content.kind -eq "nvidia") {
-						$objTabPageSettingsGroupBoxNVIDIAListView.Items.Clear()
-						$objTabPageSettingsGroupBoxNVIDIA.Visible = $True
+						$Script:FormFieldNVIDIAVisible = $True
 						$i = 0
 						ForEach ($nvidia in $Content.health) {
 							$i = $i + 1
@@ -416,8 +422,9 @@ Function Show_Dialog ($address, $port, $token, $process, $refresh) {
 							Remove-Variable -Name ListViewItem | Out-Null
 						}
 					} Else {
-						$objTabPageSettingsGroupBoxNVIDIA.Visible = $False
+						$Script:FormFieldNVIDIAVisible = $False
 					}
+					$objTabPageSettingsGroupBoxNVIDIA.Visible = $Script:FormFieldNVIDIAVisible
 
 					If ($Content.connection.pool) {
 						$objTabPageSettingsGroupBoxConnectionTextBoxPool.Text = $Content.connection.pool
@@ -720,7 +727,6 @@ Function Show_Dialog ($address, $port, $token, $process, $refresh) {
 			$objTabPageSettingsGroupBoxInformation.Controls.Add($objTabPageSettingsGroupBoxInformationLabelHugepages)
 			$objTabPageSettingsGroupBoxInformationCheckBoxHugepages = New-Object System.Windows.Forms.CheckBox
 			$objTabPageSettingsGroupBoxInformationCheckBoxHugepages.Location = New-Object System.Drawing.Point(390,95)
-#			$objTabPageSettingsGroupBoxInformationCheckBoxHugepages.Size = New-Object System.Drawing.Size(50,20)
 			$objTabPageSettingsGroupBoxInformationCheckBoxHugepages.AutoSize = $True
 			$objTabPageSettingsGroupBoxInformationCheckBoxHugepages.Checked = $False
 			$objTabPageSettingsGroupBoxInformationCheckBoxHugepages.Enabled = $False
@@ -796,33 +802,33 @@ Function Show_Dialog ($address, $port, $token, $process, $refresh) {
 
 		$objTabPageMonitor.Controls.Add($objTabPageSettingsGroupBoxCPU)
 
-		If ((GetType $Content) -eq "NVIDIA") {
+		$objTabPageSettingsGroupBoxNVIDIA = New-Object System.Windows.Forms.GroupBox
+		$objTabPageSettingsGroupBoxNVIDIA.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorNVIDIAHorizontalPosition"],$FormDimensions["objTabPageMonitorNVIDIAVerticalPosition"])
+		$objTabPageSettingsGroupBoxNVIDIA.Size = New-Object System.Drawing.Size($FormDimensions["objTabPageMonitorNVIDIAWidth"],$FormDimensions["objTabPageMonitorNVIDIAHeight"])
+		$objTabPageSettingsGroupBoxNVIDIA.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
+		$objTabPageSettingsGroupBoxNVIDIA.Visible = $Script:FormFieldNVIDIAVisible
+		$objTabPageSettingsGroupBoxNVIDIA.Text = "NVIDIA:"
 
-			$objTabPageSettingsGroupBoxNVIDIA = New-Object System.Windows.Forms.GroupBox
-			$objTabPageSettingsGroupBoxNVIDIA.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorNVIDIAHorizontalPosition"],$FormDimensions["objTabPageMonitorNVIDIAVerticalPosition"])
-			$objTabPageSettingsGroupBoxNVIDIA.Size = New-Object System.Drawing.Size($FormDimensions["objTabPageMonitorNVIDIAWidth"],$FormDimensions["objTabPageMonitorNVIDIAHeight"])
-			$objTabPageSettingsGroupBoxNVIDIA.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
-			$objTabPageSettingsGroupBoxNVIDIA.Text = "NVIDIA:"
-
-				$objTabPageSettingsGroupBoxNVIDIAListView = New-Object System.Windows.Forms.ListView
-				$objTabPageSettingsGroupBoxNVIDIAListView.Location = New-Object System.Drawing.Point(5,15)
+			$objTabPageSettingsGroupBoxNVIDIAListView = New-Object System.Windows.Forms.ListView
+			$objTabPageSettingsGroupBoxNVIDIAListView.Location = New-Object System.Drawing.Point(5,15)
+			If ($FormDimensions["objTabPageMonitorNVIDIAHeight"] -lt 15) {
+				$objTabPageSettingsGroupBoxNVIDIAListView.Size = New-Object System.Drawing.Size(620,0)
+			} Else {
 				$objTabPageSettingsGroupBoxNVIDIAListView.Size = New-Object System.Drawing.Size(620,($FormDimensions["objTabPageMonitorNVIDIAHeight"] - 15))
-				$objTabPageSettingsGroupBoxNVIDIAListView.View = [System.Windows.Forms.View]::Details
-				$objTabPageSettingsGroupBoxNVIDIAListView.Width = $objTabPageSettingsGroupBoxNVIDIAListView.ClientRectangle.Width
-				$objTabPageSettingsGroupBoxNVIDIAListView.Height = $objTabPageSettingsGroupBoxNVIDIAListView.ClientRectangle.Height
-				$objTabPageSettingsGroupBoxNVIDIAListView.Anchor = "Top, Left, Right, Bottom"
-				$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("#", 20, "Center") | Out-Null
-				$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("Name", 125, "Center") | Out-Null
-				$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("GPU Clock", 90, "Center") | Out-Null
-				$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("Memory Clock", 90, "Center") | Out-Null
-				$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("Power", 90, "Center") | Out-Null
-				$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("Temperature", 90, "Center") | Out-Null
-				$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("Fan", 90, "Center") | Out-Null
-				$objTabPageSettingsGroupBoxNVIDIAListView.Add_ColumnClick({SortListView $objTabPageSettingsGroupBoxNVIDIAListView $_.Column})
-				$objTabPageSettingsGroupBoxNVIDIA.Controls.Add($objTabPageSettingsGroupBoxNVIDIAListView)
+			}
+			$objTabPageSettingsGroupBoxNVIDIAListView.View = [System.Windows.Forms.View]::Details
+			$objTabPageSettingsGroupBoxNVIDIAListView.Anchor = "Top, Left, Right, Bottom"
+			$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("#", 20, "Center") | Out-Null
+			$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("Name", 125, "Center") | Out-Null
+			$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("GPU Clock", 90, "Center") | Out-Null
+			$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("Memory Clock", 90, "Center") | Out-Null
+			$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("Power", 90, "Center") | Out-Null
+			$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("Temperature", 90, "Center") | Out-Null
+			$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("Fan", 90, "Center") | Out-Null
+			$objTabPageSettingsGroupBoxNVIDIAListView.Add_ColumnClick({SortListView $objTabPageSettingsGroupBoxNVIDIAListView $_.Column})
+			$objTabPageSettingsGroupBoxNVIDIA.Controls.Add($objTabPageSettingsGroupBoxNVIDIAListView)
 
-			$objTabPageMonitor.Controls.Add($objTabPageSettingsGroupBoxNVIDIA)
-		}
+		$objTabPageMonitor.Controls.Add($objTabPageSettingsGroupBoxNVIDIA)
 
 		$objTabPageSettingsGroupBoxConnection = New-Object System.Windows.Forms.GroupBox
 		$objTabPageSettingsGroupBoxConnection.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorConnectionHorizontalPosition"],$FormDimensions["objTabPageMonitorConnectionVerticalPosition"])
