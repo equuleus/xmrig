@@ -795,7 +795,7 @@ Function Show_Dialog ($address, $port, $token, $process, $refresh) {
 
 		$objTabPageMonitor.Controls.Add($objTabPageSettingsGroupBoxCPU)
 
-		If (GetType ($Content) -eq "NVIDIA") {
+		If ((GetType ($Content)) -eq "NVIDIA") {
 
 			$objTabPageSettingsGroupBoxNVIDIA = New-Object System.Windows.Forms.GroupBox
 			$objTabPageSettingsGroupBoxNVIDIA.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorNVIDIAHorizontalPosition"],$FormDimensions["objTabPageMonitorNVIDIAVerticalPosition"])
