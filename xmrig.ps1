@@ -110,7 +110,7 @@ Function FormDimensions ($Content) {
 
 	$FormDimensions["objTabPageMonitorNVIDIAHorizontalPosition"] = $FormDimensions["objTabPageMonitorHorizontalPosition"]
 	$FormDimensions["objTabPageMonitorNVIDIAVerticalPosition"] = $FormDimensions["objTabPageMonitorCPUVerticalPosition"] + $FormDimensions["objTabPageMonitorCPUHeight"]
-	If ((GetType ($Content)) -eq "NVIDIA") {
+	If ((GetType $Content) -eq "NVIDIA") {
 		If ($Content.health.Count -eq 1) {
 			$FormDimensions["objTabPageMonitorNVIDIAHeight"] = 60
 		}
@@ -399,8 +399,8 @@ Function Show_Dialog ($address, $port, $token, $process, $refresh) {
 						$objTabPageSettingsGroupBoxCPUTextBoxSockets.Text = $Content.cpu.sockets
 					}
 
-					$objTabPageSettingsGroupBoxNVIDIAListView.Items.Clear()
 					If ($Content.kind -eq "nvidia") {
+						$objTabPageSettingsGroupBoxNVIDIAListView.Items.Clear()
 						$objTabPageSettingsGroupBoxNVIDIA.Visible = $True
 						$i = 0
 						ForEach ($nvidia in $Content.health) {
@@ -413,6 +413,7 @@ Function Show_Dialog ($address, $port, $token, $process, $refresh) {
 							$ListViewItem.Subitems.Add($nvidia.temp.ToString()) | Out-Null
 							$ListViewItem.Subitems.Add($nvidia.fan.ToString()) | Out-Null
 							$objTabPageSettingsGroupBoxNVIDIAListView.Items.Add($ListViewItem) | Out-Null
+							Remove-Variable -Name ListViewItem | Out-Null
 						}
 					} Else {
 						$objTabPageSettingsGroupBoxNVIDIA.Visible = $False
@@ -795,7 +796,7 @@ Function Show_Dialog ($address, $port, $token, $process, $refresh) {
 
 		$objTabPageMonitor.Controls.Add($objTabPageSettingsGroupBoxCPU)
 
-		If ((GetType ($Content)) -eq "NVIDIA") {
+		If ((GetType $Content) -eq "NVIDIA") {
 
 			$objTabPageSettingsGroupBoxNVIDIA = New-Object System.Windows.Forms.GroupBox
 			$objTabPageSettingsGroupBoxNVIDIA.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorNVIDIAHorizontalPosition"],$FormDimensions["objTabPageMonitorNVIDIAVerticalPosition"])
