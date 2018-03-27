@@ -28,6 +28,7 @@ SET PROGRAM_API_ADDRESS=127.0.0.1
 SET PROGRAM_API_PORT_CPU=10001
 SET PROGRAM_API_PORT_NVIDIA=10002
 SET PROGRAM_API_PORT_AMD=10003
+SET PROGRAM_API_TOKEN=%WALLET%
 
 SET USE_PROXY=true
 SET ALLOW_MANUAL_SELECT=true
@@ -42,17 +43,17 @@ SET PROGRAM_PATH=%SRC:~0,-1%
 SET PROGRAM_CPU_FILENAME=xmrig.exe
 SET PROGRAM_NVIDIA_FILENAME=xmrig-nvidia.exe
 SET PROGRAM_AMD_FILENAME=xmrig-amd.exe
-SET PROGRAM_PS_FILENAME=xmrig.ps1
+SET PROGRAM_PS_FILENAME=XMRig.ps1
 rem SET PROGRAM_PS_START=C:\Windows\System32\WindowsPowershell\v1.0\powershell.exe -executionpolicy unrestricted -file "%PROGRAM_PATH%\%PROGRAM_PS_FILENAME%"
 SET PROGRAM_PS_START=C:\Windows\System32\WindowsPowershell\v1.0\powershell.exe -executionpolicy unrestricted -windowstyle hidden -file "%PROGRAM_PATH%\%PROGRAM_PS_FILENAME%"
 
 SET PROGRAM_PARAMETERS=--algo=cryptonight --keepalive --retries=5 --retry-pause=5 --donate-level=1 --print-time=30 
 
-REM SETTINGS FOR: INTEL Core i7 3770k-4770k-7770k:
+REM SETTINGS FOR: INTEL Core i7 3770k-4770k-7770k
 SET PROGRAM_CPU_PARAMETERS=--av=1 --threads=4 --cpu-affinity=0xAA --cpu-priority=5
 REM SETTINGS FOR: NVIDIA GeForce GT 740
 SET PROGRAM_NVIDIA_PARAMETERS=--cuda-devices=0 --cuda-launch=94x4 --cuda-bfactor=6 --cuda-bsleep=50
-REM SETTINGS FOR: AMD Radeon RX Vega 64:
+REM SETTINGS FOR: AMD Radeon RX Vega 64
 SET PROGRAM_AMD_PARAMETERS=--opencl-devices=0 --opencl-launch=2016x8 --opencl-platform=1 --opencl-devices=0 --opencl-launch=1800x8 --opencl-platform=1 --opencl-devices=1 --opencl-launch=2016x8 --opencl-platform=1 --opencl-devices=1 --opencl-launch=1800x8 --opencl-platform=1
 
 SET PROGRAM_CPU_DIFF=20000
@@ -281,9 +282,10 @@ GOTO END
 		SET PROGRAM_PARAMETERS=--user=%USER% --pass=%PASSWORD% %PROGRAM_PARAMETERS%
 	)
 	IF "%PROGRAM_SHOW_CONSOLE%" NEQ "true" SET PROGRAM_PARAMETERS=%PROGRAM_PARAMETERS% --background
-	IF "%API_PORT%" NEQ "" SET PROGRAM_PARAMETERS=%PROGRAM_PARAMETERS% --api-port=%API_PORT% --api-worker-id=%ID%-%PARAMETER%
+	SET API_TOKEN=%PROGRAM_API_TOKEN%
 	SET API_PROCESS=%PROGRAM_FILENAME:~0,-4%
 	SET API_ADDRESS=%PROGRAM_API_ADDRESS%
+	IF "%API_PORT%" NEQ "" SET PROGRAM_PARAMETERS=%PROGRAM_PARAMETERS% --api-port=%API_PORT% --api-access-token=%API_TOKEN% --api-worker-id=%ID%-%PARAMETER%
 	CD "%PROGRAM_PATH%"
 	IF "%~1" EQU "ELEVATE" (
 		IF "%PARAMETER%" EQU "AMD" (
@@ -301,7 +303,7 @@ GOTO END
 		CALL "%PROGRAM_PATH%\%PROGRAM_FILENAME%" %PROGRAM_PARAMETERS%
 	) ELSE (
 		IF "%PROGRAM_SHOW_GUI%" EQU "true" (
-			START CMD /C "%PROGRAM_PS_START% -address %API_ADDRESS% -port %API_PORT% -process %API_PROCESS% -refresh %PROGRAM_GUI_REFRESH%"
+			START CMD /C "%PROGRAM_PS_START% -address %API_ADDRESS% -port %API_PORT% -token %API_TOKEN% -process %API_PROCESS% -refresh %PROGRAM_GUI_REFRESH%"
 		)
 		START "%PROGRAM_TITLE%" /D "%PROGRAM_PATH%" "%PROGRAM_FILENAME%" %PROGRAM_PARAMETERS%
 	)
