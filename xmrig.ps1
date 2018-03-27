@@ -419,8 +419,7 @@ Function Show_Dialog ($address, $port, $token, $process, $refresh) {
 					}
 
 					If ($Content.connection.pool) {
-#						$objTabPageSettingsGroupBoxConnectionTextBoxPool.Text = $Content.connection.pool
-						$objTabPageSettingsGroupBoxConnectionTextBoxPool.Text = "pool / proxy : port"
+						$objTabPageSettingsGroupBoxConnectionTextBoxPool.Text = $Content.connection.pool
 					}
 					If ($Content.connection.ping) {
 						$objTabPageSettingsGroupBoxConnectionTextBoxPing.Text = $Content.connection.ping
