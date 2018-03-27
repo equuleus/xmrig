@@ -1,35 +1,194 @@
 PARAM (
-	[string]$address = $(Read-Host "Input address, please: "),
-	[string]$port = $(Read-Host "Input port, please: "),
-	[string]$process = $(Read-Host "Input process name, please: "),
+	[string]$address,
+#	[string]$address = $(Read-Host "Input address, please: "),
+	[string]$port,
+	[string]$token,
+	[string]$process,
 	[string]$refresh
 )
 Set-ExecutionPolicy Unrestricted -Scope CurrentUser -Force
 
-Function API_Get ($address, $port) {
+Function API_Get ($address, $port, $token) {
 	$URI		= "http://" + $address + ":" + $port
 	$Method		= "GET"
 	$Headers	= @{
 		"Content-type" = "Application/json"
+#		"Authorization" = ("Bearer " + $token)
+	}
+	If ($token -ne "") {
+		$Headers["Authorization"] = ("Bearer " + $token)
 	}
 	$ContentType	= "Application/json"
+#	$Body		= ConvertTo-Json @{
+#		"url" = $address
+#	}
 	Try {
-		$WebRequest = Invoke-WebRequest -Uri $URI -Method $Method -Headers $Headers -ContentType $ContentType -TimeoutSec 10
+#		$WebRequest = Invoke-WebRequest -Uri $URI -Method $Method -Headers $Headers -ContentType $ContentType -Body $Body -TimeoutSec 10
+		$WebRequest = Invoke-WebRequest -Uri $URI -Method $Method -Headers $Headers -ContentType $ContentType -TimeoutSec 3
 	} Catch {
-		$_.Exception.Response
+		$StatusCode = $_.Exception.Response
 	} Finally {
 		If ($WebRequest -ne $null) {
 			$Content = $WebRequest.Content | ConvertFrom-JSON
+		} Else {
+			$Content = $null
 		}
 	}
 	Return $Content
 }
 
+Function GetType ($Content) {
+	If ($Content -ne $null) {
+		If ($Content.kind -eq "cpu") {
+			$Type = "CPU"
+		} ElseIf ($Content.kind -eq "nvidia") {
+			$Type = "NVIDIA"
+		} ElseIf ($Content.kind -eq "amd") {
+			$Type = "AMD"
+		} Else {
+			$Type = "UNKNOWN"
+		}
+	} Else {
+		$Type = "UNKNOWN"
+	}
+	Return $Type
+}
+
+Function FormDimensions ($Content) {
+
+	$FormDimensions = @{}
+
+	$FormDimensions["objFormHorizontalBorder"] = 20
+	$FormDimensions["objFormVerticalBorder"] = 20
+
+	$FormDimensions["objTabControlHorizontalPosition"] = 0
+	$FormDimensions["objTabControlVerticalPosition"] = 0
+	$FormDimensions["objTabControlHorizontalBorder"] = 10
+	$FormDimensions["objTabControlVerticalBorder"] = 10
+	$FormDimensions["objTabControlMenuHeight"] = 20
+
+	$FormDimensions["objTabPageMonitorHorizontalPosition"] = 0
+	$FormDimensions["objTabPageMonitorVerticalPosition"] = 0
+
+	$FormDimensions["objTabPageMonitorInformationWidth"] = 625
+	$FormDimensions["objTabPageMonitorInformationHeight"] = 125
+
+	$FormDimensions["objTabPageMonitorCPUWidth"] = 625
+	$FormDimensions["objTabPageMonitorCPUHeight"] = 50
+
+	$FormDimensions["objTabPageMonitorNVIDIAWidth"] = 625
+	$FormDimensions["objTabPageMonitorNVIDIAHeight"] = 110
+
+	$FormDimensions["objTabPageMonitorConnectionWidth"] = 625
+	$FormDimensions["objTabPageMonitorConnectionHeight"] = 50
+	$FormDimensions["objTabPageMonitorConnectionErrorLogHeight"] = 100
+
+	$FormDimensions["objTabPageMonitorHashrateWidth"] = 625
+	$FormDimensions["objTabPageMonitorHashrateHeight"] = 130
+
+	$FormDimensions["objTabPageMonitorResultsWidth"] = 625
+	$FormDimensions["objTabPageMonitorResultsHeight"] = 110
+	$FormDimensions["objTabPageMonitorResultsErrorLogHeight"] = 100
+
+	$FormDimensions["objTabPageOptionsHorizontalPosition"] = 0
+	$FormDimensions["objTabPageOptionsVerticalPosition"] = 0
+
+	$FormDimensions["objTabPageSettingsHorizontalPosition"] = 0
+	$FormDimensions["objTabPageSettingsVerticalPosition"] = 0
+
+	$FormDimensions["objTabPageSettingsUpdateWidth"] = 625
+	$FormDimensions["objTabPageSettingsUpdateHeight"] = 50
+
+	$FormDimensions["objTabPageSettingsManualConnectionWidth"] = 625
+	$FormDimensions["objTabPageSettingsManualConnectionHeight"] = 75
+
+	$FormDimensions["objTabPageMonitorInformationHorizontalPosition"] = $FormDimensions["objTabPageMonitorHorizontalPosition"]
+	$FormDimensions["objTabPageMonitorInformationVerticalPosition"] = $FormDimensions["objTabPageMonitorVerticalPosition"]
+
+	$FormDimensions["objTabPageMonitorCPUHorizontalPosition"] = $FormDimensions["objTabPageMonitorHorizontalPosition"]
+	$FormDimensions["objTabPageMonitorCPUVerticalPosition"] = $FormDimensions["objTabPageMonitorInformationVerticalPosition"] + $FormDimensions["objTabPageMonitorInformationHeight"]
+
+	$FormDimensions["objTabPageMonitorNVIDIAHorizontalPosition"] = $FormDimensions["objTabPageMonitorHorizontalPosition"]
+	$FormDimensions["objTabPageMonitorNVIDIAVerticalPosition"] = $FormDimensions["objTabPageMonitorCPUVerticalPosition"] + $FormDimensions["objTabPageMonitorCPUHeight"]
+	If ((GetType ($Content)) -eq "NVIDIA") {
+		If ($Content.health.Count -eq 1) {
+			$FormDimensions["objTabPageMonitorNVIDIAHeight"] = 60
+		}
+	} Else {
+		$FormDimensions["objTabPageMonitorNVIDIAHeight"] = 0
+	}
+
+	$FormDimensions["objTabPageMonitorConnectionHorizontalPosition"] = $FormDimensions["objTabPageMonitorHorizontalPosition"]
+	$FormDimensions["objTabPageMonitorConnectionVerticalPosition"] = $FormDimensions["objTabPageMonitorNVIDIAVerticalPosition"] + $FormDimensions["objTabPageMonitorNVIDIAHeight"]
+	If ($Content.connection.error_log.Count -gt 0) {
+		$Script:FormFieldConnectionErrorLogVisible = $True
+		$FormDimensions["objTabPageMonitorConnectionHeight"] = $FormDimensions["objTabPageMonitorConnectionHeight"] + $FormDimensions["objTabPageMonitorConnectionErrorLogHeight"]
+	} Else {
+		$Script:FormFieldConnectionErrorLogVisible = $False
+	}
+
+	$FormDimensions["objTabPageMonitorHashrateHorizontalPosition"] = $FormDimensions["objTabPageMonitorHorizontalPosition"]
+	$FormDimensions["objTabPageMonitorHashrateVerticalPosition"] = $FormDimensions["objTabPageMonitorConnectionVerticalPosition"] + $FormDimensions["objTabPageMonitorConnectionHeight"]
+
+	$FormDimensions["objTabPageMonitorResultsHorizontalPosition"] = $FormDimensions["objTabPageMonitorHorizontalPosition"]
+	$FormDimensions["objTabPageMonitorResultsVerticalPosition"] = $FormDimensions["objTabPageMonitorHashrateVerticalPosition"] + $FormDimensions["objTabPageMonitorHashrateHeight"]
+	If ($Content.results.error_log.Count -gt 0) {
+		$Script:FormFieldResultsErrorLogVisible = $True
+		$FormDimensions["objTabPageMonitorResultsHeight"] = $FormDimensions["objTabPageMonitorResultsHeight"] + $FormDimensions["objTabPageMonitorResultsErrorLogHeight"]
+	} Else {
+		$Script:FormFieldResultsErrorLogVisible = $False
+	}
+
+	$FormDimensions["objTabPageMonitorWidth"] = $FormDimensions["objTabPageMonitorResultsHorizontalPosition"] + $FormDimensions["objTabPageMonitorResultsWidth"]
+	$FormDimensions["objTabPageMonitorHeight"] = $FormDimensions["objTabPageMonitorResultsVerticalPosition"] + $FormDimensions["objTabPageMonitorResultsHeight"]
+
+	$FormDimensions["objTabPageOptionsWidth"] = $FormDimensions["objTabPageMonitorWidth"]
+	$FormDimensions["objTabPageOptionsHeight"] = $FormDimensions["objTabPageMonitorHeight"]
+
+	$FormDimensions["objTabPageSettingsWidth"] = $FormDimensions["objTabPageMonitorWidth"]
+	$FormDimensions["objTabPageSettingsHeight"] = $FormDimensions["objTabPageMonitorHeight"]
+
+	$FormDimensions["objTabPageSettingsUpdateHorizontalPosition"] = $FormDimensions["objTabPageSettingsHorizontalPosition"]
+	$FormDimensions["objTabPageSettingsUpdateVerticalPosition"] = $FormDimensions["objTabPageSettingsVerticalPosition"]
+
+	$FormDimensions["objTabPageSettingsManualConnectionHorizontalPosition"] = $FormDimensions["objTabPageSettingsHorizontalPosition"]
+	$FormDimensions["objTabPageSettingsManualConnectionVerticalPosition"] = $FormDimensions["objTabPageSettingsUpdateVerticalPosition"] + $FormDimensions["objTabPageSettingsUpdateHeight"]
+
+	$FormDimensions["objTabControlWidth"] = $FormDimensions["objTabPageMonitorWidth"] + $FormDimensions["objTabControlHorizontalBorder"]
+	$FormDimensions["objTabControlHeight"] = $FormDimensions["objTabPageMonitorHeight"] + $FormDimensions["objTabControlVerticalBorder"] + $FormDimensions["objTabControlMenuHeight"]
+
+	$FormDimensions["FormSizeWidth"] = $FormDimensions["objTabControlWidth"] + $FormDimensions["objFormHorizontalBorder"]
+	$FormDimensions["FormSizeHeight"] = $FormDimensions["objTabControlHeight"] + $FormDimensions["objFormVerticalBorder"] + $FormDimensions["objTabControlMenuHeight"] + 3
+
+	Return $FormDimensions
+}
+
 Function RefreshInterval ($hours, $minutes, $seconds) {
-	$objGroupBoxUpdateComboBoxHours.SelectedIndex = $objGroupBoxUpdateComboBoxHours.Items.IndexOf($hours)
-	$objGroupBoxUpdateComboBoxMinutes.SelectedIndex = $objGroupBoxUpdateComboBoxMinutes.Items.IndexOf($minutes)
-	$objGroupBoxUpdateComboBoxSeconds.SelectedIndex = $objGroupBoxUpdateComboBoxSeconds.Items.IndexOf($seconds)
+	$objTabPageSettingsGroupBoxUpdateComboBoxHours.SelectedIndex = $objTabPageSettingsGroupBoxUpdateComboBoxHours.Items.IndexOf($hours)
+	$objTabPageSettingsGroupBoxUpdateComboBoxMinutes.SelectedIndex = $objTabPageSettingsGroupBoxUpdateComboBoxMinutes.Items.IndexOf($minutes)
+	$objTabPageSettingsGroupBoxUpdateComboBoxSeconds.SelectedIndex = $objTabPageSettingsGroupBoxUpdateComboBoxSeconds.Items.IndexOf($seconds)
 	$Script:RefreshInterval = ([timespan]($hours.ToString() + ":" + $minutes.ToString() + ":" + $seconds.ToString())).TotalSeconds
+}
+
+Function TabControl ($objTabControl, $objTabPages, $Status) {
+	If ($Status -eq $True) {
+		$objTabControl.SuspendLayout()
+		$objTabControl.TabPages.Clear()
+		$i = 0
+		ForEach ($objTabPage in $objTabPages) {
+#			$objTabControl.TabPages.Add($objTabPage)
+			$objTabControl.TabPages.Insert($i, $objTabPage)
+			$i = $i + 1
+		}
+		$objTabControl.ResumeLayout()
+	}
+	If ($Status -eq $False) {
+		$objTabControl.SuspendLayout()
+		ForEach ($objTabPage in $objTabPages) {
+			$objTabControl.TabPages.Remove($objTabPage)
+		}
+		$objTabControl.ResumeLayout()
+	}
 }
 
 Function SortListView ($ListView, $Column) {
@@ -76,98 +235,38 @@ Function SortListView ($ListView, $Column) {
 	$ListView.EndUpdate()
 }
 
-Function Show_Dialog ($address, $port, $process, $refresh) {
+Function Show_Dialog ($address, $port, $token, $process, $refresh) {
 
-	$Script:RefreshInterval = [int]$refresh
-	If ($Script:RefreshInterval -le 0) {
-		$Script:RefreshInterval = 1
-	}
+	$Script:AddressDefault = $address
+	$Script:PortDefault = $port
+	$Script:TokenDefault = $token
+	$Script:ProcessDefault = $process
 
-	$Content = API_Get $address $port
-	If ($Content -ne $null) {
-		If ($Content.kind -eq "cpu") {
-			$Type = "CPU"
-		} ElseIf ($Content.kind -eq "nvidia") {
-			$Type = "NVIDIA"
-		} ElseIf ($Content.kind -eq "amd") {
-			$Type = "AMD"
-		} Else {
-			$Type = "UNKNOWN"
-		}
+	$Script:AddressCurrent = $Script:AddressDefault
+	$Script:PortCurrent = $Script:PortDefault
+	$Script:TokenCurrent = $Script:TokenDefault
+	$Script:ProcessCurrent = $Script:ProcessDefault
+
+	[int]$RefreshIntervalDefault = 3
+	If ([int]$refresh -le 0) {
+		$Script:RefreshInterval = $RefreshIntervalDefault
 	} Else {
-		$Type = "UNKNOWN"
+		$Script:RefreshInterval = [int]$refresh
 	}
 
-	[int]$objFormHorizontalPosition = 0
-	[int]$objFormVerticalPosition = 0
-	[int]$objFormHorizontalBorder = 25
-	[int]$objFormVerticalBorder = 50
+	$Content = API_Get $address $port $token
 
-	$objFormInformationHorizontalPosition = $objFormHorizontalPosition + 5
-	$objFormInformationVerticalPosition = $objFormVerticalPosition + 5
-	$objFormInformationWidth = 500
-	$objFormInformationHeight = 155
-
-	$objFormUpdateHorizontalPosition = 510
-	$objFormUpdateVerticalPosition = $objFormVerticalPosition + 5
-	$objFormUpdateWidth = 120
-	$objFormUpdateHeight = 155
-
-	$objFormCPUHorizontalPosition = 5
-	$objFormCPUVerticalPosition = $objFormInformationVerticalPosition + $objFormInformationHeight
-	$objFormCPUWidth = 625
-	$objFormCPUHeight = 55
-
-	If ($Type -eq "NVIDIA") {
-		$objFormNVIDIAHorizontalPosition = 5
-		$objFormNVIDIAVerticalPosition = $objFormCPUVerticalPosition + $objFormCPUHeight
-		$objFormNVIDIAWidth = 625
-		$objFormNVIDIAHeight = 80
-	} Else {
-		$objFormNVIDIAHorizontalPosition = 5
-		$objFormNVIDIAVerticalPosition = $objFormCPUVerticalPosition + $objFormCPUHeight
-		$objFormNVIDIAWidth = 625
-		$objFormNVIDIAHeight = 0
-	}
-
-	$objFormConnectionHorizontalPosition = 5
-	$objFormConnectionVerticalPosition = $objFormNVIDIAVerticalPosition + $objFormNVIDIAHeight
-	$objFormConnectionWidth = 625
-	$objFormConnectionHeight = 50
-	If ($Content.connection.error_log.Count -gt 0) {
-		$FormFieldConnectionErrorLogVisible = $True
-		$objFormConnectionHeight = $objFormConnectionHeight + 100
-	} Else {
-		$FormFieldConnectionErrorLogVisible = $False
-	}
-
-	$objFormHashrateHorizontalPosition = 5
-	$objFormHashrateVerticalPosition = $objFormConnectionVerticalPosition + $objFormConnectionHeight
-	$objFormHashrateWidth = 625
-	$objFormHashrateHeight = 130
-
-	$objFormResultsHorizontalPosition = 5
-	$objFormResultsVerticalPosition = $objFormHashrateVerticalPosition + $objFormHashrateHeight
-	$objFormResultsWidth = 625
-	$objFormResultsHeight = 110
-	If ($Content.results.error_log.Count -gt 0) {
-		$FormFieldResultsErrorLogVisible = $True
-		$objFormResultsHeight = $objFormResultsHeight + 100
-	} Else {
-		$FormFieldResultsErrorLogVisible = $False
-	}
-
-	$FormSizeX = $objFormResultsHorizontalPosition + $objFormResultsWidth + $objFormHorizontalBorder
-	$FormSizeY = $objFormResultsVerticalPosition + $objFormResultsHeight + $objFormVerticalBorder
+	$FormDimensions = FormDimensions ($Content)
 
 #	[System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
 	Add-Type -AssemblyName System.Windows.Forms
 
 #	$objArray = New-Object -TypeName PSCustomObject
 
-	$ObjTimer = New-Object System.Windows.Forms.Timer
-	$ObjTimer.Interval = 1000
-	$ObjTimer.Add_Tick({
+	$objTimer = New-Object System.Windows.Forms.Timer
+	$objTimer.Interval = 1000
+	$objTimer.Add_Tick({
+
 		If ($Script:RefreshTimeStart) {
 			$RefreshTimeFinish = ($Script:RefreshTimeStart + (new-timespan -seconds $Script:RefreshInterval))
 			$RefreshTimeLeft = ((New-TimeSpan -Start (get-date) -End $RefreshTimeFinish).TotalSeconds).ToString("#.")
@@ -175,136 +274,279 @@ Function Show_Dialog ($address, $port, $process, $refresh) {
 				$RefreshReload = $True
 				$RefreshTimeLeft = 0
 			} Else {
-				$RefreshReload = $False
+				If ($Script:TryToReconnect -eq $True) {
+					$RefreshReload = $True
+				} Else {
+					$RefreshReload = $False
+				}
 			}
 		} Else {
 			$RefreshReload = $True
 			$RefreshTimeLeft = 0
 		}
-		$objGroupBoxUpdateTextBoxTimeLeft.text = $RefreshTimeLeft
-		$ToolTip.SetToolTip($objGroupBoxUpdateTextBoxTimeLeft, "Time until next refresh: " + ("{0:HH:mm:ss}" -f ([datetime]([timespan]::FromSeconds($RefreshTimeLeft)).Ticks)))
+		$objTabPageSettingsGroupBoxUpdateTextBoxTimeLeft.text = $RefreshTimeLeft
+		$ToolTip.SetToolTip($objTabPageSettingsGroupBoxUpdateTextBoxTimeLeft, "Time until next refresh: " + ("{0:HH:mm:ss}" -f ([datetime]([timespan]::FromSeconds($RefreshTimeLeft)).Ticks)))
 
 		If ($RefreshReload -eq $True) {
 			$Script:RefreshTimeStart = (get-date)
-			$Content = API_Get $address $port
-			If ($Content -ne $null) {
-				$objGroupBoxInformationLabelUA.Text = $Content.ua
 
-				$objGroupBoxInformationTextBoxWorkerID.Text = $Content.worker_id
-				$objGroupBoxInformationTextBoxID.Text = $Content.id
-
-				$objGroupBoxInformationTextBoxVersion.Text = $Content.version
-				$objGroupBoxInformationTextBoxDonateLevel.Text = $Content.donate_level
-
-				$objGroupBoxInformationTextBoxKind.Text = $Content.kind
-				If ($Content.hugepages -eq "true") {
-					$objGroupBoxInformationCheckBoxHugepages.Checked = $True
-					$objGroupBoxInformationCheckBoxHugepages.Text = "Available"
+			If (($Script:AddressCurrent -eq "127.0.0.1") -and ($Script:ProcessCurrent -ne "")) {
+				If (((Get-Process -name $Script:ProcessCurrent -ErrorAction SilentlyContinue).Responding) -eq $True) {
+					$ProcessLoadedCurrentStatus = $True
 				} Else {
-					$objGroupBoxInformationCheckBoxHugepages.Checked = $False
-					$objGroupBoxInformationCheckBoxHugepages.Text = "Not available"
+					$ProcessLoadedCurrentStatus = $False
 				}
-				$objGroupBoxInformationTextBoxAlgo.Text = $Content.algo
-
-				$objGroupBoxCPUTextBoxBrand.Text = $Content.cpu.brand
-				If ($Content.cpu.aes -eq "true") {
-					$objGroupBoxCPUCheckBoxAES.Checked = $True
+				If ($Script:ProcessLoadedLastStatus -ne $null) {
+					If ($ProcessLoadedCurrentStatus -ne $Script:ProcessLoadedLastStatus) {
+						$Script:ProcessLoadedLastStatus = $ProcessLoadedCurrentStatus
+						If ($ProcessLoadedCurrentStatus -eq $True) {
+							[System.Windows.Forms.MessageBox]::Show("INFO: Process `"" + $Script:ProcessCurrent + "`" was loaded", "XMRig API Monitor", 0, [System.Windows.Forms.MessageBoxIcon]::Information) | out-null
+						} Else {
+							If ($Script:ProcessCurrent -eq $Script:ProcessDefault) {
+								TabControl $objTabControl @($objTabPageMonitor, $objTabPageOptions) $False
+								[System.Windows.Forms.MessageBox]::Show("ERROR: Process `"" + $Script:ProcessCurrent + "`" was unloaded", "XMRig API Monitor", 0, [System.Windows.Forms.MessageBoxIcon]::Warning) | out-null
+							}
+						}
+					}
 				} Else {
-					$objGroupBoxCPUCheckBoxAES.Checked = $False
-				}
-				If ($Content.cpu.x64 -eq "true") {
-					$objGroupBoxCPUCheckBoxX64.Checked = $True
-				} Else {
-					$objGroupBoxCPUCheckBoxX64.Checked = $False
-				}
-				$objGroupBoxCPUTextBoxSockets.Text = $Content.cpu.sockets
-
-				If ($Content.kind -eq "nvidia") {
-					$objGroupBoxNVIDIATextBoxName.Text = $Content.health.name
-					$objGroupBoxNVIDIATextBoxGPU.Text = $Content.health.clock
-					$objGroupBoxNVIDIATextBoxMemory.Text = $Content.health.mem_clock
-					$objGroupBoxNVIDIATextBoxPower.Text = $Content.health.power
-					$objGroupBoxNVIDIATextBoxTemperature.Text = $Content.health.temp
-					$objGroupBoxNVIDIATextBoxFan.Text = $Content.health.fan
-				}
-
-				$objGroupBoxConnectionTextBoxPool.Text = $Content.connection.pool
-				$objGroupBoxConnectionTextBoxPing.Text = $Content.connection.ping
-				$objGroupBoxConnectionTextBoxUptime.Text = $Content.connection.uptime
-				$ToolTip.SetToolTip($objGroupBoxConnectionTextBoxUptime, ("{0:dd,HH:mm:ss}" -f ([datetime]([timespan]::FromSeconds($Content.connection.uptime)).Ticks)))
-				$objGroupBoxConnectionTextBoxFailures.Text = $Content.connection.failures
-				$objGroupBoxConnectionListBoxErrorLog.Items.Clear()
-				If ($Content.connection.error_log.Count -gt 0) {
-					If ($objGroupBoxConnectionErrorLog.Visible -eq $False) {
-						$objForm.Size = "" + $objForm.Size.Width + ", " + ($objForm.Size.Height + 100) + ""
-						$objGroupBoxConnection.Size = "" + $objFormConnectionWidth + ", " + ($objFormConnectionHeight + 100) + ""
-						$objGroupBoxHashrate.Location = "" + $objFormHashrateHorizontalPosition + ", " + ($objFormHashrateVerticalPosition + 100) + ""
-						$objGroupBoxResults.Location = "" + $objFormResultsHorizontalPosition + ", " + ($objFormResultsVerticalPosition + 100) + ""
-						$objGroupBoxConnectionErrorLog.Visible = $True
-					}
-					ForEach ($error_log in $Content.connection.error_log) {
-						$objGroupBoxConnectionListBoxErrorLog.Items.Add($error_log) | Out-Null
+					$Script:ProcessLoadedLastStatus = $ProcessLoadedCurrentStatus
+					If ($ProcessLoadedCurrentStatus -ne $True) {
+						TabControl $objTabControl @($objTabPageMonitor, $objTabPageOptions) $False
+						[System.Windows.Forms.MessageBox]::Show("ERROR: Process `"" + $Script:ProcessCurrent + "`" is not loaded", "XMRig API Monitor", 0, [System.Windows.Forms.MessageBoxIcon]::Error) | out-null
 					}
 				}
-
-				$objGroupBoxHashrateTextBoxTotal1.Text = $Content.hashrate.total[0]
-				$ToolTip.SetToolTip($objGroupBoxHashrateTextBoxTotal1, ($Content.hashrate.total[0].ToString() + " hashes per second in a last 2,5 seconds"))
-				$objGroupBoxHashrateTextBoxTotal2.Text = $Content.hashrate.total[1]
-				$ToolTip.SetToolTip($objGroupBoxHashrateTextBoxTotal2, ($Content.hashrate.total[1].ToString() + " hashes per second in a last 60 seconds"))
-				$objGroupBoxHashrateTextBoxTotal3.Text = $Content.hashrate.total[2]
-				$ToolTip.SetToolTip($objGroupBoxHashrateTextBoxTotal3, ($Content.hashrate.total[2].ToString() + " hashes per second in a last 15 minutes"))
-				$objGroupBoxHashrateTextBoxHighest.Text = $Content.hashrate.highest
-				$ToolTip.SetToolTip($objGroupBoxHashrateTextBoxHighest, ($Content.hashrate.highest.ToString() + " hashes per second is a highest value since start"))
-				$objGroupBoxHashrateListViewThreads.Items.Clear()
-				$i = 0
-				ForEach ($thread in $Content.hashrate.threads) {
-					$i = $i + 1
-					$ListViewItem = New-Object System.Windows.Forms.ListViewItem($i)
-					$ListViewItem.Subitems.Add($thread[0].ToString()) | Out-Null
-					$ListViewItem.Subitems.Add($thread[1].ToString()) | Out-Null
-					$ListViewItem.Subitems.Add($thread[2].ToString()) | Out-Null
-					$objGroupBoxHashrateListViewThreads.Items.Add($ListViewItem) | Out-Null
-				}
-
-				$objGroupBoxResultsTextBoxHashes.Text = $Content.results.hashes_total
-				$ToolTip.SetToolTip($objGroupBoxResultsTextBoxHashes, ($Content.results.hashes_total.ToString() + " total hashes found"))
-				$objGroupBoxResultsTextBoxSharesTotal.Text = $Content.results.shares_total
-				$ToolTip.SetToolTip($objGroupBoxResultsTextBoxSharesTotal, ($Content.results.shares_total.ToString() + " total shares found"))
-				$objGroupBoxResultsTextBoxSharesGood.Text = $Content.results.shares_good
-				$ToolTip.SetToolTip($objGroupBoxResultsTextBoxSharesGood, ($Content.results.shares_good.ToString() + " good shares found"))
-				$objGroupBoxResultsTextBoxTime.Text = $Content.results.avg_time
-				$ToolTip.SetToolTip($objGroupBoxResultsTextBoxTime, ($Content.results.avg_time.ToString() + " seconds (" + ("{0:HH:mm:ss}" -f ([datetime]([timespan]::FromSeconds($Content.results.avg_time)).Ticks)) + ") - average time to find a share"))
-				$objGroupBoxResultsTextBoxDifficulty.Text = $Content.results.diff_current
-				$ToolTip.SetToolTip($objGroupBoxResultsTextBoxDifficulty, ($Content.results.diff_current.ToString() + " current difficulty for worker"))
-				$objGroupBoxResultsListViewTop10Shares.Items.Clear()
-				$ListViewItem = New-Object System.Windows.Forms.ListViewItem(0)
-				ForEach ($result in $Content.results.best) {
-					$ListViewItem.Subitems.Add($result.ToString()) | Out-Null
-				}
-				$objGroupBoxResultsListViewTop10Shares.Items.Add($ListViewItem) | Out-Null
-
-				$objGroupBoxResultsListBoxErrorLog.Items.Clear()
-				If ($Content.results.error_log.Count -gt 0) {
-					If ($objGroupBoxResultsErrorLog.Visible -eq $False) {
-						$objForm.Size = "" + $objForm.Size.Width + ", " + ($objForm.Size.Height + 100) + ""
-						$objGroupBoxResults.Size = "" + $objFormResultsWidth + ", " + ($objFormResultsHeight + 100) + ""
-						$objGroupBoxResultsErrorLog.Visible = $True
-					}
-					ForEach ($error_log in $Content.connection.error_log) {
-						$objGroupBoxConnectionListBoxErrorLog.Items.Add($error_log) | Out-Null
-					}
-				}
-
-				ForEach ($error_log in $Content.results.error_log) {
-					$objGroupBoxResultsListBoxErrorLog.Items.Add($error_log) | Out-Null
-				}
-
-				$objForm.Refresh()
-			} Else {
-				$ObjTimer.Stop()
-				[System.Windows.Forms.MessageBox]::Show("ERROR: Can not get content from`r`n`r`nIP: $address`r`n`r`nPORT: $port", "XMRig API Monitor", 0, [System.Windows.Forms.MessageBoxIcon]::Error) | out-null
-				$objForm.Close()
 			}
+
+			If (
+				(($ProcessLoadedCurrentStatus -ne $False) -and (($Script:AddressCurrent -eq $Script:AddressDefault) -and ($Script:PortCurrent -eq $Script:PortDefault) -and ($Script:TokenCurrent -eq $Script:TokenDefault))) -or
+				(($Script:AddressCurrent -ne $Script:AddressDefault) -or ($Script:PortCurrent -ne $Script:PortDefault) -or ($Script:TokenCurrent -ne $Script:TokenDefault))
+			) {
+				$Content = API_Get $Script:AddressCurrent $Script:PortCurrent $Script:TokenCurrent
+				If (($Content -ne $null) -and ($Content -ne "")) {
+
+					If ($Script:TryToReconnect -eq $True) {
+						$FormDimensions = FormDimensions ($Content)
+
+						$objTabPageSettingsGroupBoxInformation.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorInformationHorizontalPosition"],$FormDimensions["objTabPageMonitorInformationVerticalPosition"])
+						$objTabPageSettingsGroupBoxCPU.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorCPUHorizontalPosition"],$FormDimensions["objTabPageMonitorCPUVerticalPosition"])
+						$objTabPageSettingsGroupBoxNVIDIA.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorNVIDIAHorizontalPosition"],$FormDimensions["objTabPageMonitorNVIDIAVerticalPosition"])
+						$objTabPageSettingsGroupBoxConnection.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorConnectionHorizontalPosition"],$FormDimensions["objTabPageMonitorConnectionVerticalPosition"])
+						$objTabPageSettingsGroupBoxHashrate.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorHashrateHorizontalPosition"],$FormDimensions["objTabPageMonitorHashrateVerticalPosition"])
+						$objTabPageSettingsGroupBoxResults.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorResultsHorizontalPosition"],$FormDimensions["objTabPageMonitorResultsVerticalPosition"])
+						$objTabPageMonitor.Size = New-Object System.Drawing.Size($FormDimensions["objTabPageMonitorWidth"],$FormDimensions["objTabPageMonitorHeight"])
+
+						$objTabPageOptions.Size = New-Object System.Drawing.Size($FormDimensions["objTabPageOptionsWidth"],$FormDimensions["objTabPageOptionsHeight"])
+
+						$objTabPageSettingsGroupBoxUpdate.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageSettingsUpdateHorizontalPosition"],$FormDimensions["objTabPageSettingsUpdateVerticalPosition"])
+						$objTabPageSettingsGroupBoxManualConnection.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageSettingsManualConnectionHorizontalPosition"],$FormDimensions["objTabPageSettingsManualConnectionVerticalPosition"])
+						$objTabPageSettings.Size = New-Object System.Drawing.Size($FormDimensions["objTabPageSettingsWidth"],$FormDimensions["objTabPageSettingsHeight"])
+
+						$objTabControl.Size = New-Object System.Drawing.Size($FormDimensions["objTabControlWidth"],$FormDimensions["objTabControlHeight"])
+						$objForm.Size = New-Object System.Drawing.Size($FormDimensions["FormSizeWidth"],$FormDimensions["FormSizeHeight"])
+					}
+
+					If (($objTabControl.TabPages.Contains($objTabPageMonitor) -ne $True) -or ($objTabControl.TabPages.Contains($objTabPageOptions) -ne $True) -or ($objTabControl.TabPages.Contains($objTabPageSettings) -ne $True)) {
+						TabControl $objTabControl @($objTabPageMonitor, $objTabPageOptions, $objTabPageSettings) $True
+						RefreshInterval ("{0:HH}" -f ([datetime]([timespan]::FromSeconds($Script:RefreshInterval)).Ticks)) ("{0:mm}" -f ([datetime]([timespan]::FromSeconds($Script:RefreshInterval)).Ticks)) ("{0:ss}" -f ([datetime]([timespan]::FromSeconds($Script:RefreshInterval)).Ticks))
+					}
+
+					If ($Content.ua) {
+						$objTabPageSettingsGroupBoxInformationLabelUA.Text = $Content.ua
+					}
+
+					If ($Content.worker_id) {
+						$objTabPageSettingsGroupBoxInformationTextBoxWorkerID.Text = $Content.worker_id
+					}
+					If ($Content.id) {
+						$objTabPageSettingsGroupBoxInformationTextBoxID.Text = $Content.id
+					}
+
+					If ($Content.version) {
+						$objTabPageSettingsGroupBoxInformationTextBoxVersion.Text = $Content.version
+					}
+					If ($Content.donate_level) {
+						$objTabPageSettingsGroupBoxInformationTextBoxDonateLevel.Text = $Content.donate_level
+					}
+
+					If ($Content.kind) {
+						$objTabPageSettingsGroupBoxInformationTextBoxKind.Text = $Content.kind
+					}
+					If ($Content.hugepages -eq "true") {
+						$objTabPageSettingsGroupBoxInformationCheckBoxHugepages.Checked = $True
+						$objTabPageSettingsGroupBoxInformationCheckBoxHugepages.Text = "Available"
+					} Else {
+						$objTabPageSettingsGroupBoxInformationCheckBoxHugepages.Checked = $False
+						$objTabPageSettingsGroupBoxInformationCheckBoxHugepages.Text = "Not available"
+					}
+					If ($Content.algo) {
+						$objTabPageSettingsGroupBoxInformationTextBoxAlgo.Text = $Content.algo
+					}
+
+					If ($Content.cpu.brand) {
+						$objTabPageSettingsGroupBoxCPUTextBoxBrand.Text = $Content.cpu.brand
+					}
+					If ($Content.cpu.aes -eq "true") {
+						$objTabPageSettingsGroupBoxCPUCheckBoxAES.Checked = $True
+					} Else {
+						$objTabPageSettingsGroupBoxCPUCheckBoxAES.Checked = $False
+					}
+					If ($Content.cpu.x64 -eq "true") {
+						$objTabPageSettingsGroupBoxCPUCheckBoxX64.Checked = $True
+					} Else {
+						$objTabPageSettingsGroupBoxCPUCheckBoxX64.Checked = $False
+					}
+					If ($Content.cpu.sockets) {
+						$objTabPageSettingsGroupBoxCPUTextBoxSockets.Text = $Content.cpu.sockets
+					}
+
+					$objTabPageSettingsGroupBoxNVIDIAListView.Items.Clear()
+					If ($Content.kind -eq "nvidia") {
+						$objTabPageSettingsGroupBoxNVIDIA.Visible = $True
+						$i = 0
+						ForEach ($nvidia in $Content.health) {
+							$i = $i + 1
+							$ListViewItem = New-Object System.Windows.Forms.ListViewItem($i)
+							$ListViewItem.Subitems.Add($nvidia.name.ToString()) | Out-Null
+							$ListViewItem.Subitems.Add($nvidia.clock.ToString()) | Out-Null
+							$ListViewItem.Subitems.Add($nvidia.mem_clock.ToString()) | Out-Null
+							$ListViewItem.Subitems.Add($nvidia.power.ToString()) | Out-Null
+							$ListViewItem.Subitems.Add($nvidia.temp.ToString()) | Out-Null
+							$ListViewItem.Subitems.Add($nvidia.fan.ToString()) | Out-Null
+							$objTabPageSettingsGroupBoxNVIDIAListView.Items.Add($ListViewItem) | Out-Null
+						}
+					} Else {
+						$objTabPageSettingsGroupBoxNVIDIA.Visible = $False
+					}
+
+					If ($Content.connection.pool) {
+#						$objTabPageSettingsGroupBoxConnectionTextBoxPool.Text = $Content.connection.pool
+						$objTabPageSettingsGroupBoxConnectionTextBoxPool.Text = "pool / proxy : port"
+					}
+					If ($Content.connection.ping) {
+						$objTabPageSettingsGroupBoxConnectionTextBoxPing.Text = $Content.connection.ping
+					}
+					If ($Content.connection.uptime) {
+						$objTabPageSettingsGroupBoxConnectionTextBoxUptime.Text = $Content.connection.uptime
+						$ToolTip.SetToolTip($objTabPageSettingsGroupBoxConnectionTextBoxUptime, ("{0:dd,HH:mm:ss}" -f ([datetime]([timespan]::FromSeconds($Content.connection.uptime)).Ticks)))
+					}
+					If ($Content.connection.failures) {
+						$objTabPageSettingsGroupBoxConnectionTextBoxFailures.Text = $Content.connection.failures
+					}
+					$objTabPageSettingsGroupBoxConnectionListBoxErrorLog.Items.Clear()
+					If ($Content.connection.error_log.Count -gt 0) {
+						If ($objTabPageSettingsGroupBoxConnectionErrorLog.Visible -eq $False) {
+							$objTabPageMonitor.Size = $objTabPageMonitor.Size.Width.ToString() + ", " + ($objTabPageMonitor.Size.Height + $FormDimensions["objTabPageMonitorConnectionErrorLogHeight"]).ToString()
+							$objTabPageSettingsGroupBoxConnection.Size = $FormDimensions["objTabPageMonitorConnectionWidth"].ToString() + ", " + ($FormDimensions["objTabPageMonitorConnectionHeight"] + $FormDimensions["objTabPageMonitorConnectionErrorLogHeight"]).ToString()
+							$objTabPageSettingsGroupBoxHashrate.Location = $FormDimensions["objTabPageMonitorHashrateHorizontalPosition"].ToString() + ", " + ($FormDimensions["objTabPageMonitorHashrateVerticalPosition"] + $FormDimensions["objTabPageMonitorConnectionErrorLogHeight"]).ToString()
+							$objTabPageSettingsGroupBoxResults.Location = $FormDimensions["objTabPageMonitorResultsHorizontalPosition"].ToString() + ", " + ($FormDimensions["objTabPageMonitorResultsVerticalPosition"] + $FormDimensions["objTabPageMonitorConnectionErrorLogHeight"]).ToString()
+							$objTabPageSettingsGroupBoxConnectionErrorLog.Visible = $True
+						}
+						ForEach ($error_log in $Content.connection.error_log) {
+							$objTabPageSettingsGroupBoxConnectionListBoxErrorLog.Items.Add($error_log) | Out-Null
+						}
+					}
+
+					If ($Content.hashrate.total) {
+						$objTabPageSettingsGroupBoxHashrateTextBoxTotal1.Text = $Content.hashrate.total[0]
+						$ToolTip.SetToolTip($objTabPageSettingsGroupBoxHashrateTextBoxTotal1, ($Content.hashrate.total[0].ToString() + " hashes per second in a last 2,5 seconds"))
+						$objTabPageSettingsGroupBoxHashrateTextBoxTotal2.Text = $Content.hashrate.total[1]
+						$ToolTip.SetToolTip($objTabPageSettingsGroupBoxHashrateTextBoxTotal2, ($Content.hashrate.total[1].ToString() + " hashes per second in a last 60 seconds"))
+						$objTabPageSettingsGroupBoxHashrateTextBoxTotal3.Text = $Content.hashrate.total[2]
+						$ToolTip.SetToolTip($objTabPageSettingsGroupBoxHashrateTextBoxTotal3, ($Content.hashrate.total[2].ToString() + " hashes per second in a last 15 minutes"))
+					}
+					If ($Content.hashrate.highest) {
+						$objTabPageSettingsGroupBoxHashrateTextBoxHighest.Text = $Content.hashrate.highest
+						$ToolTip.SetToolTip($objTabPageSettingsGroupBoxHashrateTextBoxHighest, ($Content.hashrate.highest.ToString() + " hashes per second is a highest value since start"))
+					}
+					$objTabPageSettingsGroupBoxHashrateListViewThreads.Items.Clear()
+					$i = 0
+					ForEach ($thread in $Content.hashrate.threads) {
+						$i = $i + 1
+						$ListViewItem = New-Object System.Windows.Forms.ListViewItem($i)
+						$ListViewItem.Subitems.Add($thread[0].ToString()) | Out-Null
+						$ListViewItem.Subitems.Add($thread[1].ToString()) | Out-Null
+						$ListViewItem.Subitems.Add($thread[2].ToString()) | Out-Null
+						$objTabPageSettingsGroupBoxHashrateListViewThreads.Items.Add($ListViewItem) | Out-Null
+					}
+
+					If ($Content.results.hashes_total) {
+						$objTabPageSettingsGroupBoxResultsTextBoxHashes.Text = $Content.results.hashes_total
+						$ToolTip.SetToolTip($objTabPageSettingsGroupBoxResultsTextBoxHashes, ($Content.results.hashes_total.ToString() + " total hashes found"))
+					}
+					If ($Content.results.shares_total) {
+						$objTabPageSettingsGroupBoxResultsTextBoxSharesTotal.Text = $Content.results.shares_total
+						$ToolTip.SetToolTip($objTabPageSettingsGroupBoxResultsTextBoxSharesTotal, ($Content.results.shares_total.ToString() + " total shares found"))
+					}
+					If ($Content.results.shares_good) {
+						$objTabPageSettingsGroupBoxResultsTextBoxSharesGood.Text = $Content.results.shares_good
+						$ToolTip.SetToolTip($objTabPageSettingsGroupBoxResultsTextBoxSharesGood, ($Content.results.shares_good.ToString() + " good shares found"))
+					}
+					If ($Content.results.avg_time) {
+						$objTabPageSettingsGroupBoxResultsTextBoxTime.Text = $Content.results.avg_time
+						$ToolTip.SetToolTip($objTabPageSettingsGroupBoxResultsTextBoxTime, ($Content.results.avg_time.ToString() + " seconds (" + ("{0:HH:mm:ss}" -f ([datetime]([timespan]::FromSeconds($Content.results.avg_time)).Ticks)) + ") - average time to find a share"))
+					}
+					If ($Content.results.diff_current) {
+						$objTabPageSettingsGroupBoxResultsTextBoxDifficulty.Text = $Content.results.diff_current
+						$ToolTip.SetToolTip($objTabPageSettingsGroupBoxResultsTextBoxDifficulty, ($Content.results.diff_current.ToString() + " current difficulty for worker"))
+					}
+					$objTabPageSettingsGroupBoxResultsListViewTop10Shares.Items.Clear()
+					If ($Content.results.best) {
+						$ListViewItem = New-Object System.Windows.Forms.ListViewItem(0)
+						ForEach ($result in $Content.results.best) {
+							$ListViewItem.Subitems.Add($result.ToString()) | Out-Null
+						}
+						$objTabPageSettingsGroupBoxResultsListViewTop10Shares.Items.Add($ListViewItem) | Out-Null
+					}
+
+					$objTabPageSettingsGroupBoxResultsListBoxErrorLog.Items.Clear()
+					If ($Content.results.error_log.Count -gt 0) {
+						If ($objTabPageSettingsGroupBoxResultsErrorLog.Visible -eq $False) {
+							$objTabPageMonitor.Size = $objTabPageMonitor.Size.Width.ToString() + ", " + ($objTabPageMonitor.Size.Height + $FormDimensions["objTabPageMonitorResultsErrorLogHeight"]).ToString()
+							$objTabPageSettingsGroupBoxResults.Size = $FormDimensions["objTabPageMonitorResultsWidth"].ToString() + ", " + ($FormDimensions["objTabPageMonitorResultsHeight"] + $FormDimensions["objTabPageMonitorResultsErrorLogHeight"]).ToString()
+							$objTabPageSettingsGroupBoxResultsErrorLog.Visible = $True
+						}
+						ForEach ($error_log in $Content.results.error_log) {
+							$objTabPageSettingsGroupBoxResultsListBoxErrorLog.Items.Add($error_log) | Out-Null
+						}
+					}
+
+					If (($Script:AddressCurrent -ne $Script:AddressLastChange) -or ($Script:PortCurrent -ne $Script:PortLastChange)) {
+						$Script:AddressLastChange = $Script:AddressCurrent
+						$Script:PortLastChange = $Script:PortCurrent
+						$Script:ConnectionLastAttemptStatus = ""
+					}
+					If ($Script:ConnectionLastAttemptStatus -ne $True) {
+						$Script:ConnectionLastAttemptStatus = $True
+						$objTabControl.SelectedIndex = 0
+						If (($ProcessLoadedCurrentStatus -ne $True) -or (($Script:AddressCurrent -ne $Script:AddressDefault) -or ($Script:PortCurrent -ne $Script:PortDefault))) {
+							[System.Windows.Forms.MessageBox]::Show("INFO: Connection is successful`r`n`r`n`tIP: $Script:AddressCurrent`r`n`r`n`tPORT: $Script:PortCurrent", "XMRig API Monitor", 0, [System.Windows.Forms.MessageBoxIcon]::Information) | out-null
+						}
+					}
+
+					$objTabPageMonitor.Refresh()
+				} Else {
+					If ($Script:TryToReconnect -eq $True) {
+						TabControl $objTabControl @($objTabPageMonitor, $objTabPageOptions) $False
+						$Script:TryToReconnect = $False
+						If (($Script:AddressCurrent -ne "") -and ($Script:PortCurrent -ne "")) {
+							$Script:AddressLastChange = $Script:AddressCurrent
+							$Script:PortLastChange = $Script:PortCurrent
+							[System.Windows.Forms.MessageBox]::Show("ERROR: Can not get content from`r`n`r`n`tIP: $Script:AddressCurrent`r`n`r`n`tPORT: $Script:PortCurrent", "XMRig API Monitor", 0, [System.Windows.Forms.MessageBoxIcon]::Warning) | out-null
+						}
+					}
+					$Script:ConnectionLastAttemptStatus = $False
+				}
+			} Else {
+				If ($Script:TryToReconnect -eq $True) {
+					TabControl $objTabControl @($objTabPageMonitor, $objTabPageOptions) $False
+					$Script:TryToReconnect = $False
+					[System.Windows.Forms.MessageBox]::Show("ERROR: Process `"" + $Script:ProcessCurrent + "`" is not loaded", "XMRig API Monitor", 0, [System.Windows.Forms.MessageBoxIcon]::Error) | out-null
+				}
+				$Script:ConnectionLastAttemptStatus = $False
+			}
+		}
+		If ($Script:TryToReconnect -eq $True) {
+			$Script:TryToReconnect = $False
 		}
 	})
 
@@ -320,7 +562,7 @@ Function Show_Dialog ($address, $port, $process, $refresh) {
 	$objForm.StartPosition = "CenterScreen"
 # CenterScreen, Manual, WindowsDefaultLocation, WindowsDefaultBounds, CenterParent
 #	$objForm.AutoSize = $True
-	$objForm.Size = New-Object System.Drawing.Size($FormSizeX,$FormSizeY)
+	$objForm.Size = New-Object System.Drawing.Size($FormDimensions["FormSizeWidth"],$FormDimensions["FormSizeHeight"])
 	$objForm.FormBorderStyle = "Fixed3D"
 	$objForm.AutoScroll = $True
 	$objForm.MinimizeBox = $True
@@ -345,778 +587,836 @@ Function Show_Dialog ($address, $port, $process, $refresh) {
 #	$objLabel.BackColor = "Transparent"
 #	$objForm.Controls.Add($objLabel)
 
-	$objGroupBoxInformation = New-Object System.Windows.Forms.GroupBox
-	$objGroupBoxInformation.Location = New-Object System.Drawing.Point($objFormInformationHorizontalPosition,$objFormInformationVerticalPosition)
-	$objGroupBoxInformation.Size = New-Object System.Drawing.Size($objFormInformationWidth,$objFormInformationHeight)
-	$objGroupBoxInformation.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
-	$objGroupBoxInformation.Text = "Information:"
-#	$objGroupBoxInformation.AutoSize = $true
+	$objTabControl = New-Object System.Windows.Forms.TabControl
+	$objTabControl.Location  = New-Object System.Drawing.Point($FormDimensions["objTabControlHorizontalPosition"],$FormDimensions["objTabControlVerticalPosition"])
+	$objTabControl.Size = New-Object System.Drawing.Size($FormDimensions["objTabControlWidth"],$FormDimensions["objTabControlHeight"])
+	$objTabControl.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
 
-		$objGroupBoxInformationLabelUA = New-Object System.Windows.Forms.Label
-		$objGroupBoxInformationLabelUA.Location = New-Object System.Drawing.Size(5,20)
-		$objGroupBoxInformationLabelUA.Size = New-Object System.Drawing.Size(490,20)
-		$objGroupBoxInformationLabelUA.Text = ""
-		$objGroupBoxInformationLabelUA.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Bold)
-		$objGroupBoxInformationLabelUA.BackColor = "Transparent"
-		$objGroupBoxInformation.Controls.Add($objGroupBoxInformationLabelUA)
+	$objTabPageMonitor = New-Object System.Windows.Forms.TabPage
+	$objTabPageMonitor.TabIndex = 0
+	$objTabPageMonitor.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorHorizontalPosition"],$FormDimensions["objTabPageMonitorVerticalPosition"])
+	$objTabPageMonitor.Size = New-Object System.Drawing.Size($FormDimensions["objTabPageMonitorWidth"],$FormDimensions["objTabPageMonitorHeight"])
+	$objTabPageMonitor.Padding = "0, 0, 0, 0"
+	$objTabPageMonitor.Text = "Monitor"
 
-		$objGroupBoxInformationLabelWorkerID = New-Object System.Windows.Forms.Label
-		$objGroupBoxInformationLabelWorkerID.Location = New-Object System.Drawing.Size(5,45)
-		$objGroupBoxInformationLabelWorkerID.Size = New-Object System.Drawing.Size(80,20)
-		$objGroupBoxInformationLabelWorkerID.Text = "Worker ID:"
-		$objGroupBoxInformationLabelWorkerID.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxInformationLabelWorkerID.BackColor = "Transparent"
-		$objGroupBoxInformation.Controls.Add($objGroupBoxInformationLabelWorkerID)
-		$objGroupBoxInformationTextBoxWorkerID = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxInformationTextBoxWorkerID.Location = New-Object System.Drawing.Point(85,45)
-		$objGroupBoxInformationTextBoxWorkerID.Size = New-Object System.Drawing.Size(150,20)
-		$objGroupBoxInformationTextBoxWorkerID.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxInformationTextBoxWorkerID.ReadOnly = $True
-		$objGroupBoxInformationTextBoxWorkerID.Text = ""
-		$objGroupBoxInformation.Controls.Add($objGroupBoxInformationTextBoxWorkerID)
-		$objGroupBoxInformationLabelID = New-Object System.Windows.Forms.Label
-		$objGroupBoxInformationLabelID.Location = New-Object System.Drawing.Size(260,45)
-		$objGroupBoxInformationLabelID.Size = New-Object System.Drawing.Size(80,20)
-		$objGroupBoxInformationLabelID.Text = "ID:"
-		$objGroupBoxInformationLabelID.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxInformationLabelID.BackColor = "Transparent"
-		$objGroupBoxInformation.Controls.Add($objGroupBoxInformationLabelID)
-		$objGroupBoxInformationTextBoxID = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxInformationTextBoxID.Location = New-Object System.Drawing.Point(340,45)
-		$objGroupBoxInformationTextBoxID.Size = New-Object System.Drawing.Size(150,20)
-		$objGroupBoxInformationTextBoxID.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxInformationTextBoxID.ReadOnly = $True
-		$objGroupBoxInformationTextBoxID.Text = ""
-		$objGroupBoxInformation.Controls.Add($objGroupBoxInformationTextBoxID)
+		$objTabPageSettingsGroupBoxInformation = New-Object System.Windows.Forms.GroupBox
+		$objTabPageSettingsGroupBoxInformation.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorInformationHorizontalPosition"],$FormDimensions["objTabPageMonitorInformationVerticalPosition"])
+		$objTabPageSettingsGroupBoxInformation.Size = New-Object System.Drawing.Size($FormDimensions["objTabPageMonitorInformationWidth"],$FormDimensions["objTabPageMonitorInformationHeight"])
+		$objTabPageSettingsGroupBoxInformation.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
+		$objTabPageSettingsGroupBoxInformation.Text = "Information:"
+#		$objTabPageSettingsGroupBoxInformation.AutoSize = $true
 
-		$objGroupBoxInformationLabelVersion = New-Object System.Windows.Forms.Label
-		$objGroupBoxInformationLabelVersion.Location = New-Object System.Drawing.Size(5,70)
-		$objGroupBoxInformationLabelVersion.Size = New-Object System.Drawing.Size(80,20)
-		$objGroupBoxInformationLabelVersion.Text = "Version:"
-		$objGroupBoxInformationLabelVersion.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxInformationLabelVersion.BackColor = "Transparent"
-		$objGroupBoxInformation.Controls.Add($objGroupBoxInformationLabelVersion)
-		$objGroupBoxInformationTextBoxVersion = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxInformationTextBoxVersion.Location = New-Object System.Drawing.Point(85,70)
-		$objGroupBoxInformationTextBoxVersion.Size = New-Object System.Drawing.Size(50,20)
-		$objGroupBoxInformationTextBoxVersion.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxInformationTextBoxVersion.ReadOnly = $True
-		$objGroupBoxInformationTextBoxVersion.Text = ""
-		$objGroupBoxInformation.Controls.Add($objGroupBoxInformationTextBoxVersion)
-		$objGroupBoxInformationLabelDonateLevel = New-Object System.Windows.Forms.Label
-		$objGroupBoxInformationLabelDonateLevel.Location = New-Object System.Drawing.Size(260,70)
-		$objGroupBoxInformationLabelDonateLevel.Size = New-Object System.Drawing.Size(80,20)
-		$objGroupBoxInformationLabelDonateLevel.Text = "Donate:"
-		$objGroupBoxInformationLabelDonateLevel.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxInformationLabelDonateLevel.BackColor = "Transparent"
-		$objGroupBoxInformation.Controls.Add($objGroupBoxInformationLabelDonateLevel)
-		$objGroupBoxInformationTextBoxDonateLevel = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxInformationTextBoxDonateLevel.Location = New-Object System.Drawing.Point(340,70)
-		$objGroupBoxInformationTextBoxDonateLevel.Size = New-Object System.Drawing.Size(30,20)
-		$objGroupBoxInformationTextBoxDonateLevel.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxInformationTextBoxDonateLevel.ReadOnly = $True
-		$objGroupBoxInformationTextBoxDonateLevel.TextAlign = "Center";
-		$objGroupBoxInformationTextBoxDonateLevel.Text = ""
-		$objGroupBoxInformation.Controls.Add($objGroupBoxInformationTextBoxDonateLevel)
-		$objGroupBoxInformationLabelDonateLevelPercent = New-Object System.Windows.Forms.Label
-		$objGroupBoxInformationLabelDonateLevelPercent.Location = New-Object System.Drawing.Size(370,70)
-		$objGroupBoxInformationLabelDonateLevelPercent.Size = New-Object System.Drawing.Size(20,20)
-		$objGroupBoxInformationLabelDonateLevelPercent.Text = "%"
-		$objGroupBoxInformationLabelDonateLevelPercent.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxInformationLabelDonateLevelPercent.BackColor = "Transparent"
-		$objGroupBoxInformation.Controls.Add($objGroupBoxInformationLabelDonateLevelPercent)
+			$objTabPageSettingsGroupBoxInformationLabelUA = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxInformationLabelUA.Location = New-Object System.Drawing.Size(5,20)
+			$objTabPageSettingsGroupBoxInformationLabelUA.Size = New-Object System.Drawing.Size(490,20)
+			$objTabPageSettingsGroupBoxInformationLabelUA.Text = ""
+			$objTabPageSettingsGroupBoxInformationLabelUA.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Bold)
+			$objTabPageSettingsGroupBoxInformationLabelUA.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxInformation.Controls.Add($objTabPageSettingsGroupBoxInformationLabelUA)
 
-		$objGroupBoxInformationLabelKind = New-Object System.Windows.Forms.Label
-		$objGroupBoxInformationLabelKind.Location = New-Object System.Drawing.Size(5,95)
-		$objGroupBoxInformationLabelKind.Size = New-Object System.Drawing.Size(80,20)
-		$objGroupBoxInformationLabelKind.Text = "Type:"
-		$objGroupBoxInformationLabelKind.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxInformationLabelKind.BackColor = "Transparent"
-		$objGroupBoxInformation.Controls.Add($objGroupBoxInformationLabelKind)
-		$objGroupBoxInformationTextBoxKind = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxInformationTextBoxKind.Location = New-Object System.Drawing.Point(85,95)
-		$objGroupBoxInformationTextBoxKind.Size = New-Object System.Drawing.Size(50,20)
-		$objGroupBoxInformationTextBoxKind.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxInformationTextBoxKind.ReadOnly = $True
-		$objGroupBoxInformationTextBoxKind.Text = ""
-		$objGroupBoxInformation.Controls.Add($objGroupBoxInformationTextBoxKind)
-		$objGroupBoxInformationLabelHugepages = New-Object System.Windows.Forms.Label
-		$objGroupBoxInformationLabelHugepages.Location = New-Object System.Drawing.Size(260,95)
-		$objGroupBoxInformationLabelHugepages.Size = New-Object System.Drawing.Size(80,20)
-		$objGroupBoxInformationLabelHugepages.Text = "Hugepages:"
-		$objGroupBoxInformationLabelHugepages.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxInformationLabelHugepages.BackColor = "Transparent"
-		$objGroupBoxInformation.Controls.Add($objGroupBoxInformationLabelHugepages)
-		$objGroupBoxInformationCheckBoxHugepages = New-Object System.Windows.Forms.CheckBox
-		$objGroupBoxInformationCheckBoxHugepages.Location = New-Object System.Drawing.Point(340,95)
-#		$objGroupBoxInformationCheckBoxHugepages.Size = New-Object System.Drawing.Size(50,20)
-		$objGroupBoxInformationCheckBoxHugepages.AutoSize = $True
-		$objGroupBoxInformationCheckBoxHugepages.Checked = $False
-		$objGroupBoxInformationCheckBoxHugepages.Enabled = $False
-		$objGroupBoxInformationCheckBoxHugepages.Text = ""
-		$objGroupBoxInformation.Controls.Add($objGroupBoxInformationCheckBoxHugepages)
+			$objTabPageSettingsGroupBoxInformationLabelWorkerID = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxInformationLabelWorkerID.Location = New-Object System.Drawing.Size(5,45)
+			$objTabPageSettingsGroupBoxInformationLabelWorkerID.Size = New-Object System.Drawing.Size(80,20)
+			$objTabPageSettingsGroupBoxInformationLabelWorkerID.Text = "Worker ID:"
+			$objTabPageSettingsGroupBoxInformationLabelWorkerID.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxInformationLabelWorkerID.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxInformation.Controls.Add($objTabPageSettingsGroupBoxInformationLabelWorkerID)
+			$objTabPageSettingsGroupBoxInformationTextBoxWorkerID = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxInformationTextBoxWorkerID.Location = New-Object System.Drawing.Point(85,45)
+			$objTabPageSettingsGroupBoxInformationTextBoxWorkerID.Size = New-Object System.Drawing.Size(150,20)
+			$objTabPageSettingsGroupBoxInformationTextBoxWorkerID.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxInformationTextBoxWorkerID.ReadOnly = $True
+			$objTabPageSettingsGroupBoxInformationTextBoxWorkerID.Text = ""
+			$objTabPageSettingsGroupBoxInformation.Controls.Add($objTabPageSettingsGroupBoxInformationTextBoxWorkerID)
+			$objTabPageSettingsGroupBoxInformationLabelID = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxInformationLabelID.Location = New-Object System.Drawing.Size(310,45)
+			$objTabPageSettingsGroupBoxInformationLabelID.Size = New-Object System.Drawing.Size(80,20)
+			$objTabPageSettingsGroupBoxInformationLabelID.Text = "ID:"
+			$objTabPageSettingsGroupBoxInformationLabelID.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxInformationLabelID.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxInformation.Controls.Add($objTabPageSettingsGroupBoxInformationLabelID)
+			$objTabPageSettingsGroupBoxInformationTextBoxID = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxInformationTextBoxID.Location = New-Object System.Drawing.Point(390,45)
+			$objTabPageSettingsGroupBoxInformationTextBoxID.Size = New-Object System.Drawing.Size(150,20)
+			$objTabPageSettingsGroupBoxInformationTextBoxID.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxInformationTextBoxID.ReadOnly = $True
+			$objTabPageSettingsGroupBoxInformationTextBoxID.Text = ""
+			$objTabPageSettingsGroupBoxInformation.Controls.Add($objTabPageSettingsGroupBoxInformationTextBoxID)
 
-		$objGroupBoxInformationLabelAlgo = New-Object System.Windows.Forms.Label
-		$objGroupBoxInformationLabelAlgo.Location = New-Object System.Drawing.Size(5,120)
-		$objGroupBoxInformationLabelAlgo.Size = New-Object System.Drawing.Size(80,20)
-		$objGroupBoxInformationLabelAlgo.Text = "Algorytm:"
-		$objGroupBoxInformationLabelAlgo.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxInformationLabelAlgo.BackColor = "Transparent"
-		$objGroupBoxInformation.Controls.Add($objGroupBoxInformationLabelAlgo)
-		$objGroupBoxInformationTextBoxAlgo = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxInformationTextBoxAlgo.Location = New-Object System.Drawing.Point(85,120)
-		$objGroupBoxInformationTextBoxAlgo.Size = New-Object System.Drawing.Size(150,20)
-		$objGroupBoxInformationTextBoxAlgo.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxInformationTextBoxAlgo.ReadOnly = $True
-		$objGroupBoxInformationTextBoxAlgo.Text = ""
-		$objGroupBoxInformation.Controls.Add($objGroupBoxInformationTextBoxAlgo)
+			$objTabPageSettingsGroupBoxInformationLabelVersion = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxInformationLabelVersion.Location = New-Object System.Drawing.Size(5,70)
+			$objTabPageSettingsGroupBoxInformationLabelVersion.Size = New-Object System.Drawing.Size(80,20)
+			$objTabPageSettingsGroupBoxInformationLabelVersion.Text = "Version:"
+			$objTabPageSettingsGroupBoxInformationLabelVersion.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxInformationLabelVersion.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxInformation.Controls.Add($objTabPageSettingsGroupBoxInformationLabelVersion)
+			$objTabPageSettingsGroupBoxInformationTextBoxVersion = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxInformationTextBoxVersion.Location = New-Object System.Drawing.Point(85,70)
+			$objTabPageSettingsGroupBoxInformationTextBoxVersion.Size = New-Object System.Drawing.Size(50,20)
+			$objTabPageSettingsGroupBoxInformationTextBoxVersion.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxInformationTextBoxVersion.ReadOnly = $True
+			$objTabPageSettingsGroupBoxInformationTextBoxVersion.Text = ""
+			$objTabPageSettingsGroupBoxInformation.Controls.Add($objTabPageSettingsGroupBoxInformationTextBoxVersion)
 
-	$objForm.Controls.Add($objGroupBoxInformation)
+			$objTabPageSettingsGroupBoxInformationLabelKind = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxInformationLabelKind.Location = New-Object System.Drawing.Size(310,70)
+			$objTabPageSettingsGroupBoxInformationLabelKind.Size = New-Object System.Drawing.Size(80,20)
+			$objTabPageSettingsGroupBoxInformationLabelKind.Text = "Type:"
+			$objTabPageSettingsGroupBoxInformationLabelKind.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxInformationLabelKind.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxInformation.Controls.Add($objTabPageSettingsGroupBoxInformationLabelKind)
+			$objTabPageSettingsGroupBoxInformationTextBoxKind = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxInformationTextBoxKind.Location = New-Object System.Drawing.Point(390,70)
+			$objTabPageSettingsGroupBoxInformationTextBoxKind.Size = New-Object System.Drawing.Size(50,20)
+			$objTabPageSettingsGroupBoxInformationTextBoxKind.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxInformationTextBoxKind.ReadOnly = $True
+			$objTabPageSettingsGroupBoxInformationTextBoxKind.Text = ""
 
-	$objGroupBoxUpdate = New-Object System.Windows.Forms.GroupBox
-	$objGroupBoxUpdate.Location = New-Object System.Drawing.Point($objFormUpdateHorizontalPosition,$objFormUpdateVerticalPosition)
-	$objGroupBoxUpdate.Size = New-Object System.Drawing.Size($objFormUpdateWidth,$objFormUpdateHeight)
-	$objGroupBoxUpdate.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
-	$objGroupBoxUpdate.Text = "Update every:"
+			$objTabPageSettingsGroupBoxInformationLabelDonateLevel = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxInformationLabelDonateLevel.Location = New-Object System.Drawing.Size(520,70)
+			$objTabPageSettingsGroupBoxInformationLabelDonateLevel.Size = New-Object System.Drawing.Size(50,20)
+			$objTabPageSettingsGroupBoxInformationLabelDonateLevel.Text = "Donate:"
+			$objTabPageSettingsGroupBoxInformationLabelDonateLevel.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxInformationLabelDonateLevel.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxInformation.Controls.Add($objTabPageSettingsGroupBoxInformationLabelDonateLevel)
+			$objTabPageSettingsGroupBoxInformationTextBoxDonateLevel = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxInformationTextBoxDonateLevel.Location = New-Object System.Drawing.Point(570,70)
+			$objTabPageSettingsGroupBoxInformationTextBoxDonateLevel.Size = New-Object System.Drawing.Size(30,20)
+			$objTabPageSettingsGroupBoxInformationTextBoxDonateLevel.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxInformationTextBoxDonateLevel.ReadOnly = $True
+			$objTabPageSettingsGroupBoxInformationTextBoxDonateLevel.TextAlign = "Center";
+			$objTabPageSettingsGroupBoxInformationTextBoxDonateLevel.Text = ""
+			$objTabPageSettingsGroupBoxInformation.Controls.Add($objTabPageSettingsGroupBoxInformationTextBoxDonateLevel)
+			$objTabPageSettingsGroupBoxInformationLabelDonateLevelPercent = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxInformationLabelDonateLevelPercent.Location = New-Object System.Drawing.Size(600,70)
+			$objTabPageSettingsGroupBoxInformationLabelDonateLevelPercent.Size = New-Object System.Drawing.Size(20,20)
+			$objTabPageSettingsGroupBoxInformationLabelDonateLevelPercent.Text = "%"
+			$objTabPageSettingsGroupBoxInformationLabelDonateLevelPercent.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxInformationLabelDonateLevelPercent.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxInformation.Controls.Add($objTabPageSettingsGroupBoxInformationLabelDonateLevelPercent)
 
-		$objGroupBoxUpdateComboBoxDataSourceHours = New-Object System.Collections.Generic.List[System.Object]
-		$objGroupBoxUpdateComboBoxDataSourceMinutes = New-Object System.Collections.Generic.List[System.Object]
-		$objGroupBoxUpdateComboBoxDataSourceSeconds = New-Object System.Collections.Generic.List[System.Object]
-		For ($i = 0; $i -le 59 ; $i++) {
-			If ($i -le 23) {
-				$objGroupBoxUpdateComboBoxDataSourceHours.Add($i.ToString("00.##"))
-			}
-			$objGroupBoxUpdateComboBoxDataSourceMinutes.Add($i.ToString("00.##"))
-			$objGroupBoxUpdateComboBoxDataSourceSeconds.Add($i.ToString("00.##"))
+			$objTabPageSettingsGroupBoxInformationLabelAlgo = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxInformationLabelAlgo.Location = New-Object System.Drawing.Size(5,95)
+			$objTabPageSettingsGroupBoxInformationLabelAlgo.Size = New-Object System.Drawing.Size(80,20)
+			$objTabPageSettingsGroupBoxInformationLabelAlgo.Text = "Algorytm:"
+			$objTabPageSettingsGroupBoxInformationLabelAlgo.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxInformationLabelAlgo.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxInformation.Controls.Add($objTabPageSettingsGroupBoxInformationLabelAlgo)
+			$objTabPageSettingsGroupBoxInformationTextBoxAlgo = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxInformationTextBoxAlgo.Location = New-Object System.Drawing.Point(85,95)
+			$objTabPageSettingsGroupBoxInformationTextBoxAlgo.Size = New-Object System.Drawing.Size(150,20)
+			$objTabPageSettingsGroupBoxInformationTextBoxAlgo.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxInformationTextBoxAlgo.ReadOnly = $True
+			$objTabPageSettingsGroupBoxInformationTextBoxAlgo.Text = ""
+			$objTabPageSettingsGroupBoxInformation.Controls.Add($objTabPageSettingsGroupBoxInformationTextBoxAlgo)
+
+			$objTabPageSettingsGroupBoxInformation.Controls.Add($objTabPageSettingsGroupBoxInformationTextBoxKind)
+			$objTabPageSettingsGroupBoxInformationLabelHugepages = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxInformationLabelHugepages.Location = New-Object System.Drawing.Size(310,95)
+			$objTabPageSettingsGroupBoxInformationLabelHugepages.Size = New-Object System.Drawing.Size(80,20)
+			$objTabPageSettingsGroupBoxInformationLabelHugepages.Text = "Hugepages:"
+			$objTabPageSettingsGroupBoxInformationLabelHugepages.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxInformationLabelHugepages.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxInformation.Controls.Add($objTabPageSettingsGroupBoxInformationLabelHugepages)
+			$objTabPageSettingsGroupBoxInformationCheckBoxHugepages = New-Object System.Windows.Forms.CheckBox
+			$objTabPageSettingsGroupBoxInformationCheckBoxHugepages.Location = New-Object System.Drawing.Point(390,95)
+#			$objTabPageSettingsGroupBoxInformationCheckBoxHugepages.Size = New-Object System.Drawing.Size(50,20)
+			$objTabPageSettingsGroupBoxInformationCheckBoxHugepages.AutoSize = $True
+			$objTabPageSettingsGroupBoxInformationCheckBoxHugepages.Checked = $False
+			$objTabPageSettingsGroupBoxInformationCheckBoxHugepages.Enabled = $False
+			$objTabPageSettingsGroupBoxInformationCheckBoxHugepages.Text = ""
+			$objTabPageSettingsGroupBoxInformation.Controls.Add($objTabPageSettingsGroupBoxInformationCheckBoxHugepages)
+
+		$objTabPageMonitor.Controls.Add($objTabPageSettingsGroupBoxInformation)
+
+		$objTabPageSettingsGroupBoxCPU = New-Object System.Windows.Forms.GroupBox
+		$objTabPageSettingsGroupBoxCPU.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorCPUHorizontalPosition"],$FormDimensions["objTabPageMonitorCPUVerticalPosition"])
+		$objTabPageSettingsGroupBoxCPU.Size = New-Object System.Drawing.Size($FormDimensions["objTabPageMonitorCPUWidth"],$FormDimensions["objTabPageMonitorCPUHeight"])
+		$objTabPageSettingsGroupBoxCPU.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
+		$objTabPageSettingsGroupBoxCPU.Text = "CPU:"
+
+			$objTabPageSettingsGroupBoxCPULabelBrand = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxCPULabelBrand.Location = New-Object System.Drawing.Size(5,20)
+			$objTabPageSettingsGroupBoxCPULabelBrand.Size = New-Object System.Drawing.Size(50,20)
+			$objTabPageSettingsGroupBoxCPULabelBrand.Text = "Brand:"
+			$objTabPageSettingsGroupBoxCPULabelBrand.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxCPULabelBrand.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxCPU.Controls.Add($objTabPageSettingsGroupBoxCPULabelBrand)
+			$objTabPageSettingsGroupBoxCPUTextBoxBrand = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxCPUTextBoxBrand.Location = New-Object System.Drawing.Point(55,20)
+			$objTabPageSettingsGroupBoxCPUTextBoxBrand.Size = New-Object System.Drawing.Size(320,20)
+			$objTabPageSettingsGroupBoxCPUTextBoxBrand.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxCPUTextBoxBrand.ReadOnly = $True
+			$objTabPageSettingsGroupBoxCPUTextBoxBrand.Text = ""
+			$objTabPageSettingsGroupBoxCPU.Controls.Add($objTabPageSettingsGroupBoxCPUTextBoxBrand)
+
+			$objTabPageSettingsGroupBoxCPULabelAES = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxCPULabelAES.Location = New-Object System.Drawing.Size(390,20)
+			$objTabPageSettingsGroupBoxCPULabelAES.Size = New-Object System.Drawing.Size(40,20)
+			$objTabPageSettingsGroupBoxCPULabelAES.Text = "AES:"
+			$objTabPageSettingsGroupBoxCPULabelAES.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxCPULabelAES.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxCPU.Controls.Add($objTabPageSettingsGroupBoxCPULabelAES)
+			$objTabPageSettingsGroupBoxCPUCheckBoxAES = New-Object System.Windows.Forms.CheckBox
+			$objTabPageSettingsGroupBoxCPUCheckBoxAES.Location = New-Object System.Drawing.Point(430,20)
+			$objTabPageSettingsGroupBoxCPUCheckBoxAES.AutoSize = $True
+			$objTabPageSettingsGroupBoxCPUCheckBoxAES.Checked = $False
+			$objTabPageSettingsGroupBoxCPUCheckBoxAES.Enabled = $False
+			$objTabPageSettingsGroupBoxCPU.Controls.Add($objTabPageSettingsGroupBoxCPUCheckBoxAES)
+
+			$objTabPageSettingsGroupBoxCPULabelX64 = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxCPULabelX64.Location = New-Object System.Drawing.Size(460,20)
+			$objTabPageSettingsGroupBoxCPULabelX64.Size = New-Object System.Drawing.Size(40,20)
+			$objTabPageSettingsGroupBoxCPULabelX64.Text = "X64:"
+			$objTabPageSettingsGroupBoxCPULabelX64.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxCPULabelX64.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxCPU.Controls.Add($objTabPageSettingsGroupBoxCPULabelX64)
+			$objTabPageSettingsGroupBoxCPUCheckBoxX64 = New-Object System.Windows.Forms.CheckBox
+			$objTabPageSettingsGroupBoxCPUCheckBoxX64.Location = New-Object System.Drawing.Point(500,20)
+			$objTabPageSettingsGroupBoxCPUCheckBoxX64.AutoSize = $True
+			$objTabPageSettingsGroupBoxCPUCheckBoxX64.Checked = $False
+			$objTabPageSettingsGroupBoxCPUCheckBoxX64.Enabled = $False
+			$objTabPageSettingsGroupBoxCPU.Controls.Add($objTabPageSettingsGroupBoxCPUCheckBoxX64)
+
+			$objTabPageSettingsGroupBoxCPULabelSockets = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxCPULabelSockets.Location = New-Object System.Drawing.Size(530,20)
+			$objTabPageSettingsGroupBoxCPULabelSockets.Size = New-Object System.Drawing.Size(60,20)
+			$objTabPageSettingsGroupBoxCPULabelSockets.Text = "Sockets:"
+			$objTabPageSettingsGroupBoxCPULabelSockets.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxCPULabelSockets.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxCPU.Controls.Add($objTabPageSettingsGroupBoxCPULabelSockets)
+			$objTabPageSettingsGroupBoxCPUTextBoxSockets = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxCPUTextBoxSockets.Location = New-Object System.Drawing.Point(590,20)
+			$objTabPageSettingsGroupBoxCPUTextBoxSockets.Size = New-Object System.Drawing.Size(30,20)
+			$objTabPageSettingsGroupBoxCPUTextBoxSockets.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxCPUTextBoxSockets.ReadOnly = $True
+			$objTabPageSettingsGroupBoxCPUTextBoxSockets.TextAlign = "Center";
+			$objTabPageSettingsGroupBoxCPUTextBoxSockets.Text = ""
+			$objTabPageSettingsGroupBoxCPU.Controls.Add($objTabPageSettingsGroupBoxCPUTextBoxSockets)
+
+		$objTabPageMonitor.Controls.Add($objTabPageSettingsGroupBoxCPU)
+
+		If (GetType ($Content) -eq "NVIDIA") {
+
+			$objTabPageSettingsGroupBoxNVIDIA = New-Object System.Windows.Forms.GroupBox
+			$objTabPageSettingsGroupBoxNVIDIA.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorNVIDIAHorizontalPosition"],$FormDimensions["objTabPageMonitorNVIDIAVerticalPosition"])
+			$objTabPageSettingsGroupBoxNVIDIA.Size = New-Object System.Drawing.Size($FormDimensions["objTabPageMonitorNVIDIAWidth"],$FormDimensions["objTabPageMonitorNVIDIAHeight"])
+			$objTabPageSettingsGroupBoxNVIDIA.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxNVIDIA.Text = "NVIDIA:"
+
+				$objTabPageSettingsGroupBoxNVIDIAListView = New-Object System.Windows.Forms.ListView
+				$objTabPageSettingsGroupBoxNVIDIAListView.Location = New-Object System.Drawing.Point(5,15)
+				$objTabPageSettingsGroupBoxNVIDIAListView.Size = New-Object System.Drawing.Size(620,($FormDimensions["objTabPageMonitorNVIDIAHeight"] - 15))
+				$objTabPageSettingsGroupBoxNVIDIAListView.View = [System.Windows.Forms.View]::Details
+				$objTabPageSettingsGroupBoxNVIDIAListView.Width = $objTabPageSettingsGroupBoxNVIDIAListView.ClientRectangle.Width
+				$objTabPageSettingsGroupBoxNVIDIAListView.Height = $objTabPageSettingsGroupBoxNVIDIAListView.ClientRectangle.Height
+				$objTabPageSettingsGroupBoxNVIDIAListView.Anchor = "Top, Left, Right, Bottom"
+				$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("#", 20, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("Name", 125, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("GPU Clock", 90, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("Memory Clock", 90, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("Power", 90, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("Temperature", 90, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxNVIDIAListView.Columns.Add("Fan", 90, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxNVIDIAListView.Add_ColumnClick({SortListView $objTabPageSettingsGroupBoxNVIDIAListView $_.Column})
+				$objTabPageSettingsGroupBoxNVIDIA.Controls.Add($objTabPageSettingsGroupBoxNVIDIAListView)
+
+			$objTabPageMonitor.Controls.Add($objTabPageSettingsGroupBoxNVIDIA)
 		}
 
-		$objGroupBoxUpdateComboBoxHours = New-Object System.Windows.Forms.ComboBox
-		$objGroupBoxUpdateComboBoxHours.Name = "UpdateComboBoxHours"
-		$objGroupBoxUpdateComboBoxHours.DataSource = $objGroupBoxUpdateComboBoxDataSourceHours
-		$objGroupBoxUpdateComboBoxHours.Location = New-Object System.Drawing.Point(10,25)
-		$objGroupBoxUpdateComboBoxHours.Size = New-Object System.Drawing.Size(40,20)
-		$objGroupBoxUpdateComboBoxHours.Add_SelectedIndexChanged({RefreshInterval $objGroupBoxUpdateComboBoxHours.SelectedItem $objGroupBoxUpdateComboBoxMinutes.SelectedItem $objGroupBoxUpdateComboBoxSeconds.SelectedItem})
-		$objGroupBoxUpdate.Controls.Add($objGroupBoxUpdateComboBoxHours)
-		$objGroupBoxUpdateLabelHours = New-Object System.Windows.Forms.Label
-		$objGroupBoxUpdateLabelHours.Location = New-Object System.Drawing.Size(50,25)
-		$objGroupBoxUpdateLabelHours.Size = New-Object System.Drawing.Size(60,20)
-		$objGroupBoxUpdateLabelHours.Text = "Hours"
-		$objGroupBoxUpdateLabelHours.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxUpdateLabelHours.BackColor = "Transparent"
-		$objGroupBoxUpdate.Controls.Add($objGroupBoxUpdateLabelHours)
+		$objTabPageSettingsGroupBoxConnection = New-Object System.Windows.Forms.GroupBox
+		$objTabPageSettingsGroupBoxConnection.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorConnectionHorizontalPosition"],$FormDimensions["objTabPageMonitorConnectionVerticalPosition"])
+		$objTabPageSettingsGroupBoxConnection.Size = New-Object System.Drawing.Size($FormDimensions["objTabPageMonitorConnectionWidth"],$FormDimensions["objTabPageMonitorConnectionHeight"])
+		$objTabPageSettingsGroupBoxConnection.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
+		$objTabPageSettingsGroupBoxConnection.Text = "Connection:"
 
-		$objGroupBoxUpdateComboBoxMinutes = New-Object System.Windows.Forms.ComboBox
-		$objGroupBoxUpdateComboBoxMinutes.Name = "UpdateComboBoxMinutes"
-		$objGroupBoxUpdateComboBoxMinutes.DataSource = $objGroupBoxUpdateComboBoxDataSourceMinutes
-		$objGroupBoxUpdateComboBoxMinutes.Location = New-Object System.Drawing.Point(10,50)
-		$objGroupBoxUpdateComboBoxMinutes.Size = New-Object System.Drawing.Size(40,20)
-		$objGroupBoxUpdateComboBoxMinutes.Add_SelectedIndexChanged({RefreshInterval $objGroupBoxUpdateComboBoxHours.SelectedItem $objGroupBoxUpdateComboBoxMinutes.SelectedItem $objGroupBoxUpdateComboBoxSeconds.SelectedItem})
-		$objGroupBoxUpdate.Controls.Add($objGroupBoxUpdateComboBoxMinutes)
-		$objGroupBoxUpdateLabelMinutes = New-Object System.Windows.Forms.Label
-		$objGroupBoxUpdateLabelMinutes.Location = New-Object System.Drawing.Size(50,50)
-		$objGroupBoxUpdateLabelMinutes.Size = New-Object System.Drawing.Size(60,20)
-		$objGroupBoxUpdateLabelMinutes.Text = "Minutes"
-		$objGroupBoxUpdateLabelMinutes.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxUpdateLabelMinutes.BackColor = "Transparent"
-		$objGroupBoxUpdate.Controls.Add($objGroupBoxUpdateLabelMinutes)
+			$objTabPageSettingsGroupBoxConnectionLabelPool = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxConnectionLabelPool.Location = New-Object System.Drawing.Size(5,20)
+			$objTabPageSettingsGroupBoxConnectionLabelPool.Size = New-Object System.Drawing.Size(40,20)
+			$objTabPageSettingsGroupBoxConnectionLabelPool.Text = "Pool:"
+			$objTabPageSettingsGroupBoxConnectionLabelPool.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxConnectionLabelPool.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxConnection.Controls.Add($objTabPageSettingsGroupBoxConnectionLabelPool)
+			$objTabPageSettingsGroupBoxConnectionTextBoxPool = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxConnectionTextBoxPool.Location = New-Object System.Drawing.Point(45,20)
+			$objTabPageSettingsGroupBoxConnectionTextBoxPool.Size = New-Object System.Drawing.Size(190,20)
+			$objTabPageSettingsGroupBoxConnectionTextBoxPool.ReadOnly = $True
+			$objTabPageSettingsGroupBoxConnectionTextBoxPool.Text = ""
+			$objTabPageSettingsGroupBoxConnection.Controls.Add($objTabPageSettingsGroupBoxConnectionTextBoxPool)
 
-		$objGroupBoxUpdateComboBoxSeconds = New-Object System.Windows.Forms.ComboBox
-		$objGroupBoxUpdateComboBoxSeconds.Name = "UpdateComboBoxSeconds"
-		$objGroupBoxUpdateComboBoxSeconds.DataSource = $objGroupBoxUpdateComboBoxDataSourceSeconds
-		$objGroupBoxUpdateComboBoxSeconds.Location = New-Object System.Drawing.Point(10,75)
-		$objGroupBoxUpdateComboBoxSeconds.Size = New-Object System.Drawing.Size(40,20)
-		$objGroupBoxUpdateComboBoxSeconds.Add_SelectedIndexChanged({RefreshInterval $objGroupBoxUpdateComboBoxHours.SelectedItem $objGroupBoxUpdateComboBoxMinutes.SelectedItem $objGroupBoxUpdateComboBoxSeconds.SelectedItem})
-		$objGroupBoxUpdate.Controls.Add($objGroupBoxUpdateComboBoxSeconds)
-		$objGroupBoxUpdateLabelSeconds = New-Object System.Windows.Forms.Label
-		$objGroupBoxUpdateLabelSeconds.Location = New-Object System.Drawing.Size(50,75)
-		$objGroupBoxUpdateLabelSeconds.Size = New-Object System.Drawing.Size(60,20)
-		$objGroupBoxUpdateLabelSeconds.Text = "Seconds"
-		$objGroupBoxUpdateLabelSeconds.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxUpdateLabelSeconds.BackColor = "Transparent"
-		$objGroupBoxUpdate.Controls.Add($objGroupBoxUpdateLabelSeconds)
+			$objTabPageSettingsGroupBoxConnectionLabelPing = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxConnectionLabelPing.Location = New-Object System.Drawing.Size(245,20)
+			$objTabPageSettingsGroupBoxConnectionLabelPing.Size = New-Object System.Drawing.Size(40,20)
+			$objTabPageSettingsGroupBoxConnectionLabelPing.Text = "Ping:"
+			$objTabPageSettingsGroupBoxConnectionLabelPing.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxConnectionLabelPing.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxConnection.Controls.Add($objTabPageSettingsGroupBoxConnectionLabelPing)
+			$objTabPageSettingsGroupBoxConnectionTextBoxPing = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxConnectionTextBoxPing.Location = New-Object System.Drawing.Point(285,20)
+			$objTabPageSettingsGroupBoxConnectionTextBoxPing.Size = New-Object System.Drawing.Size(40,20)
+			$objTabPageSettingsGroupBoxConnectionTextBoxPing.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxConnectionTextBoxPing.ReadOnly = $True
+			$objTabPageSettingsGroupBoxConnectionTextBoxPing.TextAlign = "Center";
+			$objTabPageSettingsGroupBoxConnectionTextBoxPing.Text = ""
+			$objTabPageSettingsGroupBoxConnection.Controls.Add($objTabPageSettingsGroupBoxConnectionTextBoxPing)
+			$objTabPageSettingsGroupBoxConnectionLabelPingUnits = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxConnectionLabelPingUnits.Location = New-Object System.Drawing.Size(325,20)
+			$objTabPageSettingsGroupBoxConnectionLabelPingUnits.Size = New-Object System.Drawing.Size(40,20)
+			$objTabPageSettingsGroupBoxConnectionLabelPingUnits.Text = "[ms]"
+			$objTabPageSettingsGroupBoxConnectionLabelPingUnits.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxConnectionLabelPingUnits.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxConnection.Controls.Add($objTabPageSettingsGroupBoxConnectionLabelPingUnits)
 
-		$objGroupBoxUpdateLabelTimeLeft = New-Object System.Windows.Forms.Label
-		$objGroupBoxUpdateLabelTimeLeft.Location = New-Object System.Drawing.Size(10,100)
-		$objGroupBoxUpdateLabelTimeLeft.Size = New-Object System.Drawing.Size(100,20)
-		$objGroupBoxUpdateLabelTimeLeft.Text = "Next refresh in:"
-		$objGroupBoxUpdateLabelTimeLeft.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxUpdateLabelTimeLeft.BackColor = "Transparent"
-		$objGroupBoxUpdate.Controls.Add($objGroupBoxUpdateLabelTimeLeft)
-		$objGroupBoxUpdateTextBoxTimeLeft = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxUpdateTextBoxTimeLeft.Location = New-Object System.Drawing.Point(20,125)
-		$objGroupBoxUpdateTextBoxTimeLeft.Size = New-Object System.Drawing.Size(60,20)
-		$objGroupBoxUpdateTextBoxTimeLeft.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxUpdateTextBoxTimeLeft.ReadOnly = $True
-		$objGroupBoxUpdateTextBoxTimeLeft.TextAlign = "Center";
-		$objGroupBoxUpdateTextBoxTimeLeft.Text = ""
-		$objGroupBoxUpdate.Controls.Add($objGroupBoxUpdateTextBoxTimeLeft)
-		$objGroupBoxUpdateLabelTimeLeftUnits = New-Object System.Windows.Forms.Label
-		$objGroupBoxUpdateLabelTimeLeftUnits.Location = New-Object System.Drawing.Size(80,125)
-		$objGroupBoxUpdateLabelTimeLeftUnits.Size = New-Object System.Drawing.Size(30,20)
-		$objGroupBoxUpdateLabelTimeLeftUnits.Text = "[s]"
-		$objGroupBoxUpdateLabelTimeLeftUnits.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxUpdateLabelTimeLeftUnits.BackColor = "Transparent"
-		$objGroupBoxUpdate.Controls.Add($objGroupBoxUpdateLabelTimeLeftUnits)
+			$objTabPageSettingsGroupBoxConnectionLabelUptime = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxConnectionLabelUptime.Location = New-Object System.Drawing.Size(375,20)
+			$objTabPageSettingsGroupBoxConnectionLabelUptime.Size = New-Object System.Drawing.Size(55,20)
+			$objTabPageSettingsGroupBoxConnectionLabelUptime.Text = "Uptime:"
+			$objTabPageSettingsGroupBoxConnectionLabelUptime.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxConnectionLabelUptime.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxConnection.Controls.Add($objTabPageSettingsGroupBoxConnectionLabelUptime)
+			$objTabPageSettingsGroupBoxConnectionTextBoxUptime = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxConnectionTextBoxUptime.Location = New-Object System.Drawing.Point(430,20)
+			$objTabPageSettingsGroupBoxConnectionTextBoxUptime.Size = New-Object System.Drawing.Size(60,20)
+			$objTabPageSettingsGroupBoxConnectionTextBoxUptime.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxConnectionTextBoxUptime.ReadOnly = $True
+			$objTabPageSettingsGroupBoxConnectionTextBoxUptime.TextAlign = "Center";
+			$objTabPageSettingsGroupBoxConnectionTextBoxUptime.Text = ""
+			$objTabPageSettingsGroupBoxConnection.Controls.Add($objTabPageSettingsGroupBoxConnectionTextBoxUptime)
+			$objTabPageSettingsGroupBoxConnectionLabelUptimeUnits = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxConnectionLabelUptimeUnits.Location = New-Object System.Drawing.Size(490,20)
+			$objTabPageSettingsGroupBoxConnectionLabelUptimeUnits.Size = New-Object System.Drawing.Size(30,20)
+			$objTabPageSettingsGroupBoxConnectionLabelUptimeUnits.Text = "[s]"
+			$objTabPageSettingsGroupBoxConnectionLabelUptimeUnits.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxConnectionLabelUptimeUnits.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxConnection.Controls.Add($objTabPageSettingsGroupBoxConnectionLabelUptimeUnits)
 
-	$objForm.Controls.Add($objGroupBoxUpdate)
+			$objTabPageSettingsGroupBoxConnectionLabelFailures = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxConnectionLabelFailures.Location = New-Object System.Drawing.Size(530,20)
+			$objTabPageSettingsGroupBoxConnectionLabelFailures.Size = New-Object System.Drawing.Size(60,20)
+			$objTabPageSettingsGroupBoxConnectionLabelFailures.Text = "Failures:"
+			$objTabPageSettingsGroupBoxConnectionLabelFailures.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxConnectionLabelFailures.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxConnection.Controls.Add($objTabPageSettingsGroupBoxConnectionLabelFailures)
+			$objTabPageSettingsGroupBoxConnectionTextBoxFailures = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxConnectionTextBoxFailures.Location = New-Object System.Drawing.Point(590,20)
+			$objTabPageSettingsGroupBoxConnectionTextBoxFailures.Size = New-Object System.Drawing.Size(30,20)
+			$objTabPageSettingsGroupBoxConnectionTextBoxFailures.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxConnectionTextBoxFailures.ReadOnly = $True
+			$objTabPageSettingsGroupBoxConnectionTextBoxFailures.TextAlign = "Center";
+			$objTabPageSettingsGroupBoxConnectionTextBoxFailures.Text = ""
+			$objTabPageSettingsGroupBoxConnection.Controls.Add($objTabPageSettingsGroupBoxConnectionTextBoxFailures)
 
-	$objGroupBoxCPU = New-Object System.Windows.Forms.GroupBox
-	$objGroupBoxCPU.Location = New-Object System.Drawing.Point($objFormCPUHorizontalPosition,$objFormCPUVerticalPosition)
-	$objGroupBoxCPU.Size = New-Object System.Drawing.Size($objFormCPUWidth,$objFormCPUHeight)
-	$objGroupBoxCPU.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
-	$objGroupBoxCPU.Text = "CPU:"
+			$objTabPageSettingsGroupBoxConnectionErrorLog = New-Object System.Windows.Forms.GroupBox
+			$objTabPageSettingsGroupBoxConnectionErrorLog.Location = New-Object System.Drawing.Point(5,45)
+			$objTabPageSettingsGroupBoxConnectionErrorLog.Size = New-Object System.Drawing.Size(615,100)
+			$objTabPageSettingsGroupBoxConnectionErrorLog.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxConnectionErrorLog.Visible = $Script:FormFieldConnectionErrorLogVisible
+			$objTabPageSettingsGroupBoxConnectionErrorLog.Text = "Error log:"
 
-		$objGroupBoxCPULabelBrand = New-Object System.Windows.Forms.Label
-		$objGroupBoxCPULabelBrand.Location = New-Object System.Drawing.Size(5,20)
-		$objGroupBoxCPULabelBrand.Size = New-Object System.Drawing.Size(50,20)
-		$objGroupBoxCPULabelBrand.Text = "Brand:"
-		$objGroupBoxCPULabelBrand.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxCPULabelBrand.BackColor = "Transparent"
-		$objGroupBoxCPU.Controls.Add($objGroupBoxCPULabelBrand)
-		$objGroupBoxCPUTextBoxBrand = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxCPUTextBoxBrand.Location = New-Object System.Drawing.Point(55,20)
-		$objGroupBoxCPUTextBoxBrand.Size = New-Object System.Drawing.Size(320,20)
-		$objGroupBoxCPUTextBoxBrand.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxCPUTextBoxBrand.ReadOnly = $True
-		$objGroupBoxCPUTextBoxBrand.Text = ""
-		$objGroupBoxCPU.Controls.Add($objGroupBoxCPUTextBoxBrand)
+				$objTabPageSettingsGroupBoxConnectionListBoxErrorLog = New-Object System.Windows.Forms.ListBox
+				$objTabPageSettingsGroupBoxConnectionListBoxErrorLog.Location = New-Object System.Drawing.Point(5,15)
+				$objTabPageSettingsGroupBoxConnectionListBoxErrorLog.Size = New-Object System.Drawing.Size(605,80)
+				$objTabPageSettingsGroupBoxConnectionErrorLog.Controls.Add($objTabPageSettingsGroupBoxConnectionListBoxErrorLog)
 
-		$objGroupBoxCPULabelAES = New-Object System.Windows.Forms.Label
-		$objGroupBoxCPULabelAES.Location = New-Object System.Drawing.Size(390,20)
-		$objGroupBoxCPULabelAES.Size = New-Object System.Drawing.Size(40,20)
-		$objGroupBoxCPULabelAES.Text = "AES:"
-		$objGroupBoxCPULabelAES.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxCPULabelAES.BackColor = "Transparent"
-		$objGroupBoxCPU.Controls.Add($objGroupBoxCPULabelAES)
-		$objGroupBoxCPUCheckBoxAES = New-Object System.Windows.Forms.CheckBox
-		$objGroupBoxCPUCheckBoxAES.Location = New-Object System.Drawing.Point(430,20)
-		$objGroupBoxCPUCheckBoxAES.AutoSize = $True
-		$objGroupBoxCPUCheckBoxAES.Checked = $False
-		$objGroupBoxCPUCheckBoxAES.Enabled = $False
-		$objGroupBoxCPU.Controls.Add($objGroupBoxCPUCheckBoxAES)
+			$objTabPageSettingsGroupBoxConnection.Controls.Add($objTabPageSettingsGroupBoxConnectionErrorLog)
 
-		$objGroupBoxCPULabelX64 = New-Object System.Windows.Forms.Label
-		$objGroupBoxCPULabelX64.Location = New-Object System.Drawing.Size(460,20)
-		$objGroupBoxCPULabelX64.Size = New-Object System.Drawing.Size(40,20)
-		$objGroupBoxCPULabelX64.Text = "X64:"
-		$objGroupBoxCPULabelX64.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxCPULabelX64.BackColor = "Transparent"
-		$objGroupBoxCPU.Controls.Add($objGroupBoxCPULabelX64)
-		$objGroupBoxCPUCheckBoxX64 = New-Object System.Windows.Forms.CheckBox
-		$objGroupBoxCPUCheckBoxX64.Location = New-Object System.Drawing.Point(500,20)
-		$objGroupBoxCPUCheckBoxX64.AutoSize = $True
-		$objGroupBoxCPUCheckBoxX64.Checked = $False
-		$objGroupBoxCPUCheckBoxX64.Enabled = $False
-		$objGroupBoxCPU.Controls.Add($objGroupBoxCPUCheckBoxX64)
+		$objTabPageMonitor.Controls.Add($objTabPageSettingsGroupBoxConnection)
 
-		$objGroupBoxCPULabelSockets = New-Object System.Windows.Forms.Label
-		$objGroupBoxCPULabelSockets.Location = New-Object System.Drawing.Size(530,20)
-		$objGroupBoxCPULabelSockets.Size = New-Object System.Drawing.Size(60,20)
-		$objGroupBoxCPULabelSockets.Text = "Sockets:"
-		$objGroupBoxCPULabelSockets.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxCPULabelSockets.BackColor = "Transparent"
-		$objGroupBoxCPU.Controls.Add($objGroupBoxCPULabelSockets)
-		$objGroupBoxCPUTextBoxSockets = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxCPUTextBoxSockets.Location = New-Object System.Drawing.Point(590,20)
-		$objGroupBoxCPUTextBoxSockets.Size = New-Object System.Drawing.Size(30,20)
-		$objGroupBoxCPUTextBoxSockets.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxCPUTextBoxSockets.ReadOnly = $True
-		$objGroupBoxCPUTextBoxSockets.TextAlign = "Center";
-		$objGroupBoxCPUTextBoxSockets.Text = ""
-		$objGroupBoxCPU.Controls.Add($objGroupBoxCPUTextBoxSockets)
+		$objTabPageSettingsGroupBoxHashrate = New-Object System.Windows.Forms.GroupBox
+		$objTabPageSettingsGroupBoxHashrate.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorHashrateHorizontalPosition"],$FormDimensions["objTabPageMonitorHashrateVerticalPosition"])
+		$objTabPageSettingsGroupBoxHashrate.Size = New-Object System.Drawing.Size($FormDimensions["objTabPageMonitorHashrateWidth"],$FormDimensions["objTabPageMonitorHashrateHeight"])
+		$objTabPageSettingsGroupBoxHashrate.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
+		$objTabPageSettingsGroupBoxHashrate.Text = "Hashrate:"
 
-	$objForm.Controls.Add($objGroupBoxCPU)
+			$objTabPageSettingsGroupBoxHashrateLabelTotal1 = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxHashrateLabelTotal1.Location = New-Object System.Drawing.Size(5,20)
+			$objTabPageSettingsGroupBoxHashrateLabelTotal1.Size = New-Object System.Drawing.Size(150,20)
+			$objTabPageSettingsGroupBoxHashrateLabelTotal1.Text = "Total (in 2,5 seconds):"
+			$objTabPageSettingsGroupBoxHashrateLabelTotal1.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxHashrateLabelTotal1.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxHashrate.Controls.Add($objTabPageSettingsGroupBoxHashrateLabelTotal1)
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal1 = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal1.Location = New-Object System.Drawing.Point(155,20)
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal1.Size = New-Object System.Drawing.Size(60,20)
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal1.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal1.ReadOnly = $True
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal1.TextAlign = "Center";
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal1.Text = ""
+			$objTabPageSettingsGroupBoxHashrate.Controls.Add($objTabPageSettingsGroupBoxHashrateTextBoxTotal1)
+			$objTabPageSettingsGroupBoxHashrateLabelTotalUnits1 = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxHashrateLabelTotalUnits1.Location = New-Object System.Drawing.Size(215,20)
+			$objTabPageSettingsGroupBoxHashrateLabelTotalUnits1.Size = New-Object System.Drawing.Size(40,20)
+			$objTabPageSettingsGroupBoxHashrateLabelTotalUnits1.Text = "[H/s]"
+			$objTabPageSettingsGroupBoxHashrateLabelTotalUnits1.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxHashrateLabelTotalUnits1.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxHashrate.Controls.Add($objTabPageSettingsGroupBoxHashrateLabelTotalUnits1)
 
-	If ($Type -eq "NVIDIA") {
+			$objTabPageSettingsGroupBoxHashrateLabelTotal2 = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxHashrateLabelTotal2.Location = New-Object System.Drawing.Size(5,45)
+			$objTabPageSettingsGroupBoxHashrateLabelTotal2.Size = New-Object System.Drawing.Size(150,20)
+			$objTabPageSettingsGroupBoxHashrateLabelTotal2.Text = "Total (in 60 seconds):"
+			$objTabPageSettingsGroupBoxHashrateLabelTotal2.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxHashrateLabelTotal2.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxHashrate.Controls.Add($objTabPageSettingsGroupBoxHashrateLabelTotal2)
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal2 = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal2.Location = New-Object System.Drawing.Point(155,45)
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal2.Size = New-Object System.Drawing.Size(60,20)
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal2.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal2.ReadOnly = $True
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal2.TextAlign = "Center";
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal2.Text = ""
+			$objTabPageSettingsGroupBoxHashrate.Controls.Add($objTabPageSettingsGroupBoxHashrateTextBoxTotal2)
+			$objTabPageSettingsGroupBoxHashrateLabelTotalUnits2 = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxHashrateLabelTotalUnits2.Location = New-Object System.Drawing.Size(215,45)
+			$objTabPageSettingsGroupBoxHashrateLabelTotalUnits2.Size = New-Object System.Drawing.Size(40,20)
+			$objTabPageSettingsGroupBoxHashrateLabelTotalUnits2.Text = "[H/s]"
+			$objTabPageSettingsGroupBoxHashrateLabelTotalUnits2.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxHashrateLabelTotalUnits2.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxHashrate.Controls.Add($objTabPageSettingsGroupBoxHashrateLabelTotalUnits2)
 
-		$objGroupBoxNVIDIA = New-Object System.Windows.Forms.GroupBox
-		$objGroupBoxNVIDIA.Location = New-Object System.Drawing.Point($objFormNVIDIAHorizontalPosition,$objFormNVIDIAVerticalPosition)
-		$objGroupBoxNVIDIA.Size = New-Object System.Drawing.Size($objFormNVIDIAWidth,$objFormNVIDIAHeight)
-		$objGroupBoxNVIDIA.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxNVIDIA.Text = "NVIDIA:"
+			$objTabPageSettingsGroupBoxHashrateLabelTotal3 = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxHashrateLabelTotal3.Location = New-Object System.Drawing.Size(5,70)
+			$objTabPageSettingsGroupBoxHashrateLabelTotal3.Size = New-Object System.Drawing.Size(150,20)
+			$objTabPageSettingsGroupBoxHashrateLabelTotal3.Text = "Total (in 15 minutes):"
+			$objTabPageSettingsGroupBoxHashrateLabelTotal3.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxHashrateLabelTotal3.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxHashrate.Controls.Add($objTabPageSettingsGroupBoxHashrateLabelTotal3)
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal3 = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal3.Location = New-Object System.Drawing.Point(155,70)
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal3.Size = New-Object System.Drawing.Size(60,20)
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal3.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal3.ReadOnly = $True
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal3.TextAlign = "Center";
+			$objTabPageSettingsGroupBoxHashrateTextBoxTotal3.Text = ""
+			$objTabPageSettingsGroupBoxHashrate.Controls.Add($objTabPageSettingsGroupBoxHashrateTextBoxTotal3)
+			$objTabPageSettingsGroupBoxHashrateLabelTotalUnits3 = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxHashrateLabelTotalUnits3.Location = New-Object System.Drawing.Size(215,70)
+			$objTabPageSettingsGroupBoxHashrateLabelTotalUnits3.Size = New-Object System.Drawing.Size(40,20)
+			$objTabPageSettingsGroupBoxHashrateLabelTotalUnits3.Text = "[H/s]"
+			$objTabPageSettingsGroupBoxHashrateLabelTotalUnits3.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxHashrateLabelTotalUnits3.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxHashrate.Controls.Add($objTabPageSettingsGroupBoxHashrateLabelTotalUnits3)
 
-			$objGroupBoxNVIDIALabelName = New-Object System.Windows.Forms.Label
-			$objGroupBoxNVIDIALabelName.Location = New-Object System.Drawing.Size(5,20)
-			$objGroupBoxNVIDIALabelName.Size = New-Object System.Drawing.Size(50,20)
-			$objGroupBoxNVIDIALabelName.Text = "Name:"
-			$objGroupBoxNVIDIALabelName.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-			$objGroupBoxNVIDIALabelName.BackColor = "Transparent"
-			$objGroupBoxNVIDIA.Controls.Add($objGroupBoxNVIDIALabelName)
-			$objGroupBoxNVIDIATextBoxName = New-Object System.Windows.Forms.TextBox
-			$objGroupBoxNVIDIATextBoxName.Location = New-Object System.Drawing.Point(55,20)
-			$objGroupBoxNVIDIATextBoxName.Size = New-Object System.Drawing.Size(320,20)
-			$objGroupBoxNVIDIATextBoxName.Cursor = [System.Windows.Forms.Cursors]::Default
-			$objGroupBoxNVIDIATextBoxName.ReadOnly = $True
-			$objGroupBoxNVIDIATextBoxName.Text = ""
-			$objGroupBoxNVIDIA.Controls.Add($objGroupBoxNVIDIATextBoxName)
+			$objTabPageSettingsGroupBoxHashrateLabelHighest = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxHashrateLabelHighest.Location = New-Object System.Drawing.Size(5,95)
+			$objTabPageSettingsGroupBoxHashrateLabelHighest.Size = New-Object System.Drawing.Size(150,20)
+			$objTabPageSettingsGroupBoxHashrateLabelHighest.Text = "Highest:"
+			$objTabPageSettingsGroupBoxHashrateLabelHighest.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxHashrateLabelHighest.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxHashrate.Controls.Add($objTabPageSettingsGroupBoxHashrateLabelHighest)
+			$objTabPageSettingsGroupBoxHashrateTextBoxHighest = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxHashrateTextBoxHighest.Location = New-Object System.Drawing.Point(155,95)
+			$objTabPageSettingsGroupBoxHashrateTextBoxHighest.Size = New-Object System.Drawing.Size(60,20)
+			$objTabPageSettingsGroupBoxHashrateTextBoxHighest.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxHashrateTextBoxHighest.ReadOnly = $True
+			$objTabPageSettingsGroupBoxHashrateTextBoxHighest.TextAlign = "Center";
+			$objTabPageSettingsGroupBoxHashrateTextBoxHighest.Text = ""
+			$objTabPageSettingsGroupBoxHashrate.Controls.Add($objTabPageSettingsGroupBoxHashrateTextBoxHighest)
+			$objTabPageSettingsGroupBoxHashrateLabelHighestUnits = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxHashrateLabelHighestUnits.Location = New-Object System.Drawing.Size(215,95)
+			$objTabPageSettingsGroupBoxHashrateLabelHighestUnits.Size = New-Object System.Drawing.Size(40,20)
+			$objTabPageSettingsGroupBoxHashrateLabelHighestUnits.Text = "[H/s]"
+			$objTabPageSettingsGroupBoxHashrateLabelHighestUnits.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxHashrateLabelHighestUnits.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxHashrate.Controls.Add($objTabPageSettingsGroupBoxHashrateLabelHighestUnits)
 
-			$objGroupBoxNVIDIALabelGPU = New-Object System.Windows.Forms.Label
-			$objGroupBoxNVIDIALabelGPU.Location = New-Object System.Drawing.Size(390,20)
-			$objGroupBoxNVIDIALabelGPU.Size = New-Object System.Drawing.Size(40,20)
-			$objGroupBoxNVIDIALabelGPU.Text = "GPU:"
-			$objGroupBoxNVIDIALabelGPU.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-			$objGroupBoxNVIDIALabelGPU.BackColor = "Transparent"
-			$objGroupBoxNVIDIA.Controls.Add($objGroupBoxNVIDIALabelGPU)
-			$objGroupBoxNVIDIATextBoxGPU = New-Object System.Windows.Forms.TextBox
-			$objGroupBoxNVIDIATextBoxGPU.Location = New-Object System.Drawing.Point(430,20)
-			$objGroupBoxNVIDIATextBoxGPU.Size = New-Object System.Drawing.Size(50,20)
-			$objGroupBoxNVIDIATextBoxGPU.Cursor = [System.Windows.Forms.Cursors]::Default
-			$objGroupBoxNVIDIATextBoxGPU.ReadOnly = $True
-			$objGroupBoxNVIDIATextBoxGPU.Text = ""
-			$objGroupBoxNVIDIA.Controls.Add($objGroupBoxNVIDIATextBoxGPU)
+			$objTabPageSettingsGroupBoxHashrateThreads = New-Object System.Windows.Forms.GroupBox
+			$objTabPageSettingsGroupBoxHashrateThreads.Location = New-Object System.Drawing.Point(360,10)
+			$objTabPageSettingsGroupBoxHashrateThreads.Size = New-Object System.Drawing.Size(260,115)
+			$objTabPageSettingsGroupBoxHashrateThreads.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxHashrateThreads.Text = "Threads:"
 
-			$objGroupBoxNVIDIALabelMemory = New-Object System.Windows.Forms.Label
-			$objGroupBoxNVIDIALabelMemory.Location = New-Object System.Drawing.Size(505,20)
-			$objGroupBoxNVIDIALabelMemory.Size = New-Object System.Drawing.Size(65,20)
-			$objGroupBoxNVIDIALabelMemory.Text = "Memory:"
-			$objGroupBoxNVIDIALabelMemory.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-			$objGroupBoxNVIDIALabelMemory.BackColor = "Transparent"
-			$objGroupBoxNVIDIA.Controls.Add($objGroupBoxNVIDIALabelMemory)
-			$objGroupBoxNVIDIATextBoxMemory = New-Object System.Windows.Forms.TextBox
-			$objGroupBoxNVIDIATextBoxMemory.Location = New-Object System.Drawing.Point(570,20)
-			$objGroupBoxNVIDIATextBoxMemory.Size = New-Object System.Drawing.Size(50,20)
-			$objGroupBoxNVIDIATextBoxMemory.Cursor = [System.Windows.Forms.Cursors]::Default
-			$objGroupBoxNVIDIATextBoxMemory.ReadOnly = $True
-			$objGroupBoxNVIDIATextBoxMemory.Text = ""
-			$objGroupBoxNVIDIA.Controls.Add($objGroupBoxNVIDIATextBoxMemory)
+				$objTabPageSettingsGroupBoxHashrateListViewThreads = New-Object System.Windows.Forms.ListView
+				$objTabPageSettingsGroupBoxHashrateListViewThreads.Location = New-Object System.Drawing.Point(5,15)
+				$objTabPageSettingsGroupBoxHashrateListViewThreads.Size = New-Object System.Drawing.Size(255,95)
+				$objTabPageSettingsGroupBoxHashrateListViewThreads.View = [System.Windows.Forms.View]::Details
+				$objTabPageSettingsGroupBoxHashrateListViewThreads.Width = $objTabPageSettingsGroupBoxHashrateListViewThreads.ClientRectangle.Width
+				$objTabPageSettingsGroupBoxHashrateListViewThreads.Height = $objTabPageSettingsGroupBoxHashrateListViewThreads.ClientRectangle.Height
+				$objTabPageSettingsGroupBoxHashrateListViewThreads.Anchor = "Top, Left, Right, Bottom"
+				$objTabPageSettingsGroupBoxHashrateListViewThreads.Columns.Add("#", 20, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxHashrateListViewThreads.Columns.Add("2,5s", 70, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxHashrateListViewThreads.Columns.Add("60s", 70, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxHashrateListViewThreads.Columns.Add("15m", 70, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxHashrateListViewThreads.Add_ColumnClick({SortListView $objTabPageSettingsGroupBoxHashrateListViewThreads $_.Column})
+				$objTabPageSettingsGroupBoxHashrateThreads.Controls.Add($objTabPageSettingsGroupBoxHashrateListViewThreads)
 
-			$objGroupBoxNVIDIALabelPower = New-Object System.Windows.Forms.Label
-			$objGroupBoxNVIDIALabelPower.Location = New-Object System.Drawing.Size(5,45)
-			$objGroupBoxNVIDIALabelPower.Size = New-Object System.Drawing.Size(50,20)
-			$objGroupBoxNVIDIALabelPower.Text = "Power:"
-			$objGroupBoxNVIDIALabelPower.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-			$objGroupBoxNVIDIALabelPower.BackColor = "Transparent"
-			$objGroupBoxNVIDIA.Controls.Add($objGroupBoxNVIDIALabelPower)
-			$objGroupBoxNVIDIATextBoxPower = New-Object System.Windows.Forms.TextBox
-			$objGroupBoxNVIDIATextBoxPower.Location = New-Object System.Drawing.Point(55,45)
-			$objGroupBoxNVIDIATextBoxPower.Size = New-Object System.Drawing.Size(50,20)
-			$objGroupBoxNVIDIATextBoxPower.Cursor = [System.Windows.Forms.Cursors]::Default
-			$objGroupBoxNVIDIATextBoxPower.ReadOnly = $True
-			$objGroupBoxNVIDIATextBoxPower.Text = ""
-			$objGroupBoxNVIDIA.Controls.Add($objGroupBoxNVIDIATextBoxPower)
-			$objGroupBoxNVIDIALabelPowerUnits = New-Object System.Windows.Forms.Label
-			$objGroupBoxNVIDIALabelPowerUnits.Location = New-Object System.Drawing.Size(110,45)
-			$objGroupBoxNVIDIALabelPowerUnits.Size = New-Object System.Drawing.Size(40,20)
-			$objGroupBoxNVIDIALabelPowerUnits.Text = "Watt"
-			$objGroupBoxNVIDIALabelPowerUnits.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-			$objGroupBoxNVIDIALabelPowerUnits.BackColor = "Transparent"
-			$objGroupBoxNVIDIA.Controls.Add($objGroupBoxNVIDIALabelPowerUnits)
+			$objTabPageSettingsGroupBoxHashrate.Controls.Add($objTabPageSettingsGroupBoxHashrateThreads)
 
-			$objGroupBoxNVIDIALabelTemperature = New-Object System.Windows.Forms.Label
-			$objGroupBoxNVIDIALabelTemperature.Location = New-Object System.Drawing.Size(230,45)
-			$objGroupBoxNVIDIALabelTemperature.Size = New-Object System.Drawing.Size(90,20)
-			$objGroupBoxNVIDIALabelTemperature.Text = "Temperature:"
-			$objGroupBoxNVIDIALabelTemperature.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-			$objGroupBoxNVIDIALabelTemperature.BackColor = "Transparent"
-			$objGroupBoxNVIDIA.Controls.Add($objGroupBoxNVIDIALabelTemperature)
-			$objGroupBoxNVIDIATextBoxTemperature = New-Object System.Windows.Forms.TextBox
-			$objGroupBoxNVIDIATextBoxTemperature.Location = New-Object System.Drawing.Point(320,45)
-			$objGroupBoxNVIDIATextBoxTemperature.Size = New-Object System.Drawing.Size(50,20)
-			$objGroupBoxNVIDIATextBoxTemperature.Cursor = [System.Windows.Forms.Cursors]::Default
-			$objGroupBoxNVIDIATextBoxTemperature.ReadOnly = $True
-			$objGroupBoxNVIDIATextBoxTemperature.Text = ""
-			$objGroupBoxNVIDIA.Controls.Add($objGroupBoxNVIDIATextBoxTemperature)
-			$objGroupBoxNVIDIALabelTemperatureUnits = New-Object System.Windows.Forms.Label
-			$objGroupBoxNVIDIALabelTemperatureUnits.Location = New-Object System.Drawing.Size(375,45)
-			$objGroupBoxNVIDIALabelTemperatureUnits.Size = New-Object System.Drawing.Size(30,20)
-			$objGroupBoxNVIDIALabelTemperatureUnits.Text = "C"
-			$objGroupBoxNVIDIALabelTemperatureUnits.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-			$objGroupBoxNVIDIALabelTemperatureUnits.BackColor = "Transparent"
-			$objGroupBoxNVIDIA.Controls.Add($objGroupBoxNVIDIALabelTemperatureUnits)
+		$objTabPageMonitor.Controls.Add($objTabPageSettingsGroupBoxHashrate)
 
-			$objGroupBoxNVIDIALabelFan = New-Object System.Windows.Forms.Label
-			$objGroupBoxNVIDIALabelFan.Location = New-Object System.Drawing.Size(485,45)
-			$objGroupBoxNVIDIALabelFan.Size = New-Object System.Drawing.Size(35,20)
-			$objGroupBoxNVIDIALabelFan.Text = "Fan:"
-			$objGroupBoxNVIDIALabelFan.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-			$objGroupBoxNVIDIALabelFan.BackColor = "Transparent"
-			$objGroupBoxNVIDIA.Controls.Add($objGroupBoxNVIDIALabelFan)
-			$objGroupBoxNVIDIATextBoxFan = New-Object System.Windows.Forms.TextBox
-			$objGroupBoxNVIDIATextBoxFan.Location = New-Object System.Drawing.Point(520,45)
-			$objGroupBoxNVIDIATextBoxFan.Size = New-Object System.Drawing.Size(50,20)
-			$objGroupBoxNVIDIATextBoxFan.Cursor = [System.Windows.Forms.Cursors]::Default
-			$objGroupBoxNVIDIATextBoxFan.ReadOnly = $True
-			$objGroupBoxNVIDIATextBoxFan.Text = ""
-			$objGroupBoxNVIDIA.Controls.Add($objGroupBoxNVIDIATextBoxFan)
-			$objGroupBoxNVIDIALabelFanUnits = New-Object System.Windows.Forms.Label
-			$objGroupBoxNVIDIALabelFanUnits.Location = New-Object System.Drawing.Size(575,45)
-			$objGroupBoxNVIDIALabelFanUnits.Size = New-Object System.Drawing.Size(40,20)
-			$objGroupBoxNVIDIALabelFanUnits.Text = "RPM"
-			$objGroupBoxNVIDIALabelFanUnits.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-			$objGroupBoxNVIDIALabelFanUnits.BackColor = "Transparent"
-			$objGroupBoxNVIDIA.Controls.Add($objGroupBoxNVIDIALabelFanUnits)
+		$objTabPageSettingsGroupBoxResults = New-Object System.Windows.Forms.GroupBox
+		$objTabPageSettingsGroupBoxResults.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageMonitorResultsHorizontalPosition"],$FormDimensions["objTabPageMonitorResultsVerticalPosition"])
+		$objTabPageSettingsGroupBoxResults.Size = New-Object System.Drawing.Size($FormDimensions["objTabPageMonitorResultsWidth"],$FormDimensions["objTabPageMonitorResultsHeight"])
+		$objTabPageSettingsGroupBoxResults.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
+		$objTabPageSettingsGroupBoxResults.Text = "Results:"
 
-		$objForm.Controls.Add($objGroupBoxNVIDIA)
-	}
+			$objTabPageSettingsGroupBoxResultsLabelHashes = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxResultsLabelHashes.Location = New-Object System.Drawing.Size(5,20)
+			$objTabPageSettingsGroupBoxResultsLabelHashes.Size = New-Object System.Drawing.Size(55,20)
+			$objTabPageSettingsGroupBoxResultsLabelHashes.Text = "Hashes:"
+			$objTabPageSettingsGroupBoxResultsLabelHashes.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxResultsLabelHashes.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxResults.Controls.Add($objTabPageSettingsGroupBoxResultsLabelHashes)
+			$objTabPageSettingsGroupBoxResultsTextBoxHashes = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxResultsTextBoxHashes.Location = New-Object System.Drawing.Point(60,20)
+			$objTabPageSettingsGroupBoxResultsTextBoxHashes.Size = New-Object System.Drawing.Size(80,20)
+			$objTabPageSettingsGroupBoxResultsTextBoxHashes.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxResultsTextBoxHashes.ReadOnly = $True
+			$objTabPageSettingsGroupBoxResultsTextBoxHashes.TextAlign = "Center";
+			$objTabPageSettingsGroupBoxResultsTextBoxHashes.Text = ""
+			$objTabPageSettingsGroupBoxResults.Controls.Add($objTabPageSettingsGroupBoxResultsTextBoxHashes)
 
-	$objGroupBoxConnection = New-Object System.Windows.Forms.GroupBox
-	$objGroupBoxConnection.Location = New-Object System.Drawing.Point($objFormConnectionHorizontalPosition,$objFormConnectionVerticalPosition)
-	$objGroupBoxConnection.Size = New-Object System.Drawing.Size($objFormConnectionWidth,$objFormConnectionHeight)
-	$objGroupBoxConnection.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
-	$objGroupBoxConnection.Text = "Connection:"
+			$objTabPageSettingsGroupBoxResultsLabelShares = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxResultsLabelShares.Location = New-Object System.Drawing.Size(150,20)
+			$objTabPageSettingsGroupBoxResultsLabelShares.Size = New-Object System.Drawing.Size(135,20)
+			$objTabPageSettingsGroupBoxResultsLabelShares.Text = "Shares (total / good):"
+			$objTabPageSettingsGroupBoxResultsLabelShares.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxResultsLabelShares.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxResults.Controls.Add($objTabPageSettingsGroupBoxResultsLabelShares)
+			$objTabPageSettingsGroupBoxResultsTextBoxSharesTotal = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxResultsTextBoxSharesTotal.Location = New-Object System.Drawing.Point(290,20)
+			$objTabPageSettingsGroupBoxResultsTextBoxSharesTotal.Size = New-Object System.Drawing.Size(40,20)
+			$objTabPageSettingsGroupBoxResultsTextBoxSharesTotal.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxResultsTextBoxSharesTotal.ReadOnly = $True
+			$objTabPageSettingsGroupBoxResultsTextBoxSharesTotal.TextAlign = "Center";
+			$objTabPageSettingsGroupBoxResultsTextBoxSharesTotal.Text = ""
+			$objTabPageSettingsGroupBoxResults.Controls.Add($objTabPageSettingsGroupBoxResultsTextBoxSharesTotal)
+			$objTabPageSettingsGroupBoxResultsLabelSharesDelimeter = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxResultsLabelSharesDelimeter.Location = New-Object System.Drawing.Size(330,20)
+			$objTabPageSettingsGroupBoxResultsLabelSharesDelimeter.Size = New-Object System.Drawing.Size(10,20)
+			$objTabPageSettingsGroupBoxResultsLabelSharesDelimeter.Text = "/"
+			$objTabPageSettingsGroupBoxResultsLabelSharesDelimeter.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxResultsLabelSharesDelimeter.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxResults.Controls.Add($objTabPageSettingsGroupBoxResultsLabelSharesDelimeter)
+			$objTabPageSettingsGroupBoxResultsTextBoxSharesGood = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxResultsTextBoxSharesGood.Location = New-Object System.Drawing.Point(340,20)
+			$objTabPageSettingsGroupBoxResultsTextBoxSharesGood.Size = New-Object System.Drawing.Size(40,20)
+			$objTabPageSettingsGroupBoxResultsTextBoxSharesGood.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxResultsTextBoxSharesGood.ReadOnly = $True
+			$objTabPageSettingsGroupBoxResultsTextBoxSharesGood.TextAlign = "Center";
+			$objTabPageSettingsGroupBoxResultsTextBoxSharesGood.Text = ""
+			$objTabPageSettingsGroupBoxResults.Controls.Add($objTabPageSettingsGroupBoxResultsTextBoxSharesGood)
 
-		$objGroupBoxConnectionLabelPool = New-Object System.Windows.Forms.Label
-		$objGroupBoxConnectionLabelPool.Location = New-Object System.Drawing.Size(5,20)
-		$objGroupBoxConnectionLabelPool.Size = New-Object System.Drawing.Size(40,20)
-		$objGroupBoxConnectionLabelPool.Text = "Pool:"
-		$objGroupBoxConnectionLabelPool.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxConnectionLabelPool.BackColor = "Transparent"
-		$objGroupBoxConnection.Controls.Add($objGroupBoxConnectionLabelPool)
-		$objGroupBoxConnectionTextBoxPool = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxConnectionTextBoxPool.Location = New-Object System.Drawing.Point(45,20)
-		$objGroupBoxConnectionTextBoxPool.Size = New-Object System.Drawing.Size(190,20)
-		$objGroupBoxConnectionTextBoxPool.ReadOnly = $False
-		$objGroupBoxConnectionTextBoxPool.Text = ""
-		$objGroupBoxConnection.Controls.Add($objGroupBoxConnectionTextBoxPool)
+			$objTabPageSettingsGroupBoxResultsLabelTime = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxResultsLabelTime.Location = New-Object System.Drawing.Size(390,20)
+			$objTabPageSettingsGroupBoxResultsLabelTime.Size = New-Object System.Drawing.Size(45,20)
+			$objTabPageSettingsGroupBoxResultsLabelTime.Text = "Time:"
+			$objTabPageSettingsGroupBoxResultsLabelTime.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxResultsLabelTime.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxResults.Controls.Add($objTabPageSettingsGroupBoxResultsLabelTime)
+			$objTabPageSettingsGroupBoxResultsTextBoxTime = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxResultsTextBoxTime.Location = New-Object System.Drawing.Point(435,20)
+			$objTabPageSettingsGroupBoxResultsTextBoxTime.Size = New-Object System.Drawing.Size(40,20)
+			$objTabPageSettingsGroupBoxResultsTextBoxTime.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxResultsTextBoxTime.ReadOnly = $True
+			$objTabPageSettingsGroupBoxResultsTextBoxTime.TextAlign = "Center";
+			$objTabPageSettingsGroupBoxResultsTextBoxTime.Text = ""
+			$objTabPageSettingsGroupBoxResults.Controls.Add($objTabPageSettingsGroupBoxResultsTextBoxTime)
 
-		$objGroupBoxConnectionLabelPing = New-Object System.Windows.Forms.Label
-		$objGroupBoxConnectionLabelPing.Location = New-Object System.Drawing.Size(245,20)
-		$objGroupBoxConnectionLabelPing.Size = New-Object System.Drawing.Size(40,20)
-		$objGroupBoxConnectionLabelPing.Text = "Ping:"
-		$objGroupBoxConnectionLabelPing.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxConnectionLabelPing.BackColor = "Transparent"
-		$objGroupBoxConnection.Controls.Add($objGroupBoxConnectionLabelPing)
-		$objGroupBoxConnectionTextBoxPing = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxConnectionTextBoxPing.Location = New-Object System.Drawing.Point(285,20)
-		$objGroupBoxConnectionTextBoxPing.Size = New-Object System.Drawing.Size(40,20)
-		$objGroupBoxConnectionTextBoxPing.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxConnectionTextBoxPing.ReadOnly = $True
-		$objGroupBoxConnectionTextBoxPing.TextAlign = "Center";
-		$objGroupBoxConnectionTextBoxPing.Text = ""
-		$objGroupBoxConnection.Controls.Add($objGroupBoxConnectionTextBoxPing)
-		$objGroupBoxConnectionLabelPingUnits = New-Object System.Windows.Forms.Label
-		$objGroupBoxConnectionLabelPingUnits.Location = New-Object System.Drawing.Size(325,20)
-		$objGroupBoxConnectionLabelPingUnits.Size = New-Object System.Drawing.Size(40,20)
-		$objGroupBoxConnectionLabelPingUnits.Text = "[ms]"
-		$objGroupBoxConnectionLabelPingUnits.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxConnectionLabelPingUnits.BackColor = "Transparent"
-		$objGroupBoxConnection.Controls.Add($objGroupBoxConnectionLabelPingUnits)
+			$objTabPageSettingsGroupBoxResultsLabelDifficulty = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxResultsLabelDifficulty.Location = New-Object System.Drawing.Size(485,20)
+			$objTabPageSettingsGroupBoxResultsLabelDifficulty.Size = New-Object System.Drawing.Size(75,20)
+			$objTabPageSettingsGroupBoxResultsLabelDifficulty.Text = "Difficulty:"
+			$objTabPageSettingsGroupBoxResultsLabelDifficulty.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxResultsLabelDifficulty.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxResults.Controls.Add($objTabPageSettingsGroupBoxResultsLabelDifficulty)
+			$objTabPageSettingsGroupBoxResultsTextBoxDifficulty = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxResultsTextBoxDifficulty.Location = New-Object System.Drawing.Point(560,20)
+			$objTabPageSettingsGroupBoxResultsTextBoxDifficulty.Size = New-Object System.Drawing.Size(60,20)
+			$objTabPageSettingsGroupBoxResultsTextBoxDifficulty.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxResultsTextBoxDifficulty.ReadOnly = $True
+			$objTabPageSettingsGroupBoxResultsTextBoxDifficulty.TextAlign = "Center";
+			$objTabPageSettingsGroupBoxResultsTextBoxDifficulty.Text = ""
+			$objTabPageSettingsGroupBoxResults.Controls.Add($objTabPageSettingsGroupBoxResultsTextBoxDifficulty)
 
-		$objGroupBoxConnectionLabelUptime = New-Object System.Windows.Forms.Label
-		$objGroupBoxConnectionLabelUptime.Location = New-Object System.Drawing.Size(375,20)
-		$objGroupBoxConnectionLabelUptime.Size = New-Object System.Drawing.Size(55,20)
-		$objGroupBoxConnectionLabelUptime.Text = "Uptime:"
-		$objGroupBoxConnectionLabelUptime.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxConnectionLabelUptime.BackColor = "Transparent"
-		$objGroupBoxConnection.Controls.Add($objGroupBoxConnectionLabelUptime)
-		$objGroupBoxConnectionTextBoxUptime = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxConnectionTextBoxUptime.Location = New-Object System.Drawing.Point(430,20)
-		$objGroupBoxConnectionTextBoxUptime.Size = New-Object System.Drawing.Size(60,20)
-		$objGroupBoxConnectionTextBoxUptime.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxConnectionTextBoxUptime.ReadOnly = $True
-		$objGroupBoxConnectionTextBoxUptime.TextAlign = "Center";
-		$objGroupBoxConnectionTextBoxUptime.Text = ""
-		$objGroupBoxConnection.Controls.Add($objGroupBoxConnectionTextBoxUptime)
-		$objGroupBoxConnectionLabelUptimeUnits = New-Object System.Windows.Forms.Label
-		$objGroupBoxConnectionLabelUptimeUnits.Location = New-Object System.Drawing.Size(490,20)
-		$objGroupBoxConnectionLabelUptimeUnits.Size = New-Object System.Drawing.Size(30,20)
-		$objGroupBoxConnectionLabelUptimeUnits.Text = "[s]"
-		$objGroupBoxConnectionLabelUptimeUnits.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxConnectionLabelUptimeUnits.BackColor = "Transparent"
-		$objGroupBoxConnection.Controls.Add($objGroupBoxConnectionLabelUptimeUnits)
+			$objTabPageSettingsGroupBoxResultsTop10Shares = New-Object System.Windows.Forms.GroupBox
+			$objTabPageSettingsGroupBoxResultsTop10Shares.Location = New-Object System.Drawing.Point(5,45)
+			$objTabPageSettingsGroupBoxResultsTop10Shares.Size = New-Object System.Drawing.Size(615,60)
+			$objTabPageSettingsGroupBoxResultsTop10Shares.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxResultsTop10Shares.Text = "Top 10 Shares:"
 
-		$objGroupBoxConnectionLabelFailures = New-Object System.Windows.Forms.Label
-		$objGroupBoxConnectionLabelFailures.Location = New-Object System.Drawing.Size(530,20)
-		$objGroupBoxConnectionLabelFailures.Size = New-Object System.Drawing.Size(60,20)
-		$objGroupBoxConnectionLabelFailures.Text = "Failures:"
-		$objGroupBoxConnectionLabelFailures.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxConnectionLabelFailures.BackColor = "Transparent"
-		$objGroupBoxConnection.Controls.Add($objGroupBoxConnectionLabelFailures)
-		$objGroupBoxConnectionTextBoxFailures = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxConnectionTextBoxFailures.Location = New-Object System.Drawing.Point(590,20)
-		$objGroupBoxConnectionTextBoxFailures.Size = New-Object System.Drawing.Size(30,20)
-		$objGroupBoxConnectionTextBoxFailures.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxConnectionTextBoxFailures.ReadOnly = $True
-		$objGroupBoxConnectionTextBoxFailures.TextAlign = "Center";
-		$objGroupBoxConnectionTextBoxFailures.Text = ""
-		$objGroupBoxConnection.Controls.Add($objGroupBoxConnectionTextBoxFailures)
+				$objTabPageSettingsGroupBoxResultsListViewTop10Shares = New-Object System.Windows.Forms.ListView
+				$objTabPageSettingsGroupBoxResultsListViewTop10Shares.Location = New-Object System.Drawing.Point(5,15)
+				$objTabPageSettingsGroupBoxResultsListViewTop10Shares.Size = New-Object System.Drawing.Size(610,45)
+				$objTabPageSettingsGroupBoxResultsListViewTop10Shares.View = [System.Windows.Forms.View]::Details
+				$objTabPageSettingsGroupBoxResultsListViewTop10Shares.Width = $objTabPageSettingsGroupBoxResultsListViewTop10Shares.ClientRectangle.Width
+				$objTabPageSettingsGroupBoxResultsListViewTop10Shares.Height = $objTabPageSettingsGroupBoxResultsListViewTop10Shares.ClientRectangle.Height
+				$objTabPageSettingsGroupBoxResultsListViewTop10Shares.Anchor = "Top, Left, Right, Bottom"
+				$objTabPageSettingsGroupBoxResultsListViewTop10Shares.Columns.Add("0", 0) | Out-Null
+				$objTabPageSettingsGroupBoxResultsListViewTop10Shares.Columns.Add("1", 60, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxResultsListViewTop10Shares.Columns.Add("2", 60, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxResultsListViewTop10Shares.Columns.Add("3", 60, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxResultsListViewTop10Shares.Columns.Add("4", 60, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxResultsListViewTop10Shares.Columns.Add("5", 60, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxResultsListViewTop10Shares.Columns.Add("6", 60, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxResultsListViewTop10Shares.Columns.Add("7", 60, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxResultsListViewTop10Shares.Columns.Add("8", 60, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxResultsListViewTop10Shares.Columns.Add("9", 60, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxResultsListViewTop10Shares.Columns.Add("10", 60, "Center") | Out-Null
+				$objTabPageSettingsGroupBoxResultsTop10Shares.Controls.Add($objTabPageSettingsGroupBoxResultsListViewTop10Shares)
 
-		$objGroupBoxConnectionErrorLog = New-Object System.Windows.Forms.GroupBox
-		$objGroupBoxConnectionErrorLog.Location = New-Object System.Drawing.Point(5,45)
-		$objGroupBoxConnectionErrorLog.Size = New-Object System.Drawing.Size(615,100)
-		$objGroupBoxConnectionErrorLog.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxConnectionErrorLog.Visible = $FormFieldConnectionErrorLogVisible
-		$objGroupBoxConnectionErrorLog.Text = "Error log:"
+			$objTabPageSettingsGroupBoxResults.Controls.Add($objTabPageSettingsGroupBoxResultsTop10Shares)
 
-			$objGroupBoxConnectionListBoxErrorLog = New-Object System.Windows.Forms.ListBox
-			$objGroupBoxConnectionListBoxErrorLog.Location = New-Object System.Drawing.Point(5,15)
-			$objGroupBoxConnectionListBoxErrorLog.Size = New-Object System.Drawing.Size(605,80)
-			$objGroupBoxConnectionErrorLog.Controls.Add($objGroupBoxConnectionListBoxErrorLog)
+			$objTabPageSettingsGroupBoxResultsErrorLog = New-Object System.Windows.Forms.GroupBox
+			$objTabPageSettingsGroupBoxResultsErrorLog.Location = New-Object System.Drawing.Point(5,105)
+			$objTabPageSettingsGroupBoxResultsErrorLog.Size = New-Object System.Drawing.Size(615,100)
+			$objTabPageSettingsGroupBoxResultsErrorLog.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxResultsErrorLog.Visible = $Script:FormFieldResultsErrorLogVisible
+			$objTabPageSettingsGroupBoxResultsErrorLog.Text = "Error log:"
 
-		$objGroupBoxConnection.Controls.Add($objGroupBoxConnectionErrorLog)
+				$objTabPageSettingsGroupBoxResultsListBoxErrorLog = New-Object System.Windows.Forms.ListBox
+				$objTabPageSettingsGroupBoxResultsListBoxErrorLog.Location = New-Object System.Drawing.Point(5,15)
+				$objTabPageSettingsGroupBoxResultsListBoxErrorLog.Size = New-Object System.Drawing.Size(605,80)
+				$objTabPageSettingsGroupBoxResultsErrorLog.Controls.Add($objTabPageSettingsGroupBoxResultsListBoxErrorLog)
 
-	$objForm.Controls.Add($objGroupBoxConnection)
+			$objTabPageSettingsGroupBoxResults.Controls.Add($objTabPageSettingsGroupBoxResultsErrorLog)
 
-	$objGroupBoxHashrate = New-Object System.Windows.Forms.GroupBox
-	$objGroupBoxHashrate.Location = New-Object System.Drawing.Point($objFormHashrateHorizontalPosition,$objFormHashrateVerticalPosition)
-	$objGroupBoxHashrate.Size = New-Object System.Drawing.Size($objFormHashrateWidth,$objFormHashrateHeight)
-	$objGroupBoxHashrate.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
-	$objGroupBoxHashrate.Text = "Hashrate:"
+		$objTabPageMonitor.Controls.Add($objTabPageSettingsGroupBoxResults)
 
-		$objGroupBoxHashrateLabelTotal1 = New-Object System.Windows.Forms.Label
-		$objGroupBoxHashrateLabelTotal1.Location = New-Object System.Drawing.Size(5,20)
-		$objGroupBoxHashrateLabelTotal1.Size = New-Object System.Drawing.Size(150,20)
-		$objGroupBoxHashrateLabelTotal1.Text = "Total (in 2,5 seconds):"
-		$objGroupBoxHashrateLabelTotal1.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxHashrateLabelTotal1.BackColor = "Transparent"
-		$objGroupBoxHashrate.Controls.Add($objGroupBoxHashrateLabelTotal1)
-		$objGroupBoxHashrateTextBoxTotal1 = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxHashrateTextBoxTotal1.Location = New-Object System.Drawing.Point(155,20)
-		$objGroupBoxHashrateTextBoxTotal1.Size = New-Object System.Drawing.Size(60,20)
-		$objGroupBoxHashrateTextBoxTotal1.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxHashrateTextBoxTotal1.ReadOnly = $True
-		$objGroupBoxHashrateTextBoxTotal1.TextAlign = "Center";
-		$objGroupBoxHashrateTextBoxTotal1.Text = ""
-		$objGroupBoxHashrate.Controls.Add($objGroupBoxHashrateTextBoxTotal1)
-		$objGroupBoxHashrateLabelTotalUnits1 = New-Object System.Windows.Forms.Label
-		$objGroupBoxHashrateLabelTotalUnits1.Location = New-Object System.Drawing.Size(215,20)
-		$objGroupBoxHashrateLabelTotalUnits1.Size = New-Object System.Drawing.Size(40,20)
-		$objGroupBoxHashrateLabelTotalUnits1.Text = "[H/s]"
-		$objGroupBoxHashrateLabelTotalUnits1.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxHashrateLabelTotalUnits1.BackColor = "Transparent"
-		$objGroupBoxHashrate.Controls.Add($objGroupBoxHashrateLabelTotalUnits1)
+	$objTabControl.Controls.Add($objTabPageMonitor)
 
-		$objGroupBoxHashrateLabelTotal2 = New-Object System.Windows.Forms.Label
-		$objGroupBoxHashrateLabelTotal2.Location = New-Object System.Drawing.Size(5,45)
-		$objGroupBoxHashrateLabelTotal2.Size = New-Object System.Drawing.Size(150,20)
-		$objGroupBoxHashrateLabelTotal2.Text = "Total (in 60 seconds):"
-		$objGroupBoxHashrateLabelTotal2.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxHashrateLabelTotal2.BackColor = "Transparent"
-		$objGroupBoxHashrate.Controls.Add($objGroupBoxHashrateLabelTotal2)
-		$objGroupBoxHashrateTextBoxTotal2 = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxHashrateTextBoxTotal2.Location = New-Object System.Drawing.Point(155,45)
-		$objGroupBoxHashrateTextBoxTotal2.Size = New-Object System.Drawing.Size(60,20)
-		$objGroupBoxHashrateTextBoxTotal2.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxHashrateTextBoxTotal2.ReadOnly = $True
-		$objGroupBoxHashrateTextBoxTotal2.TextAlign = "Center";
-		$objGroupBoxHashrateTextBoxTotal2.Text = ""
-		$objGroupBoxHashrate.Controls.Add($objGroupBoxHashrateTextBoxTotal2)
-		$objGroupBoxHashrateLabelTotalUnits2 = New-Object System.Windows.Forms.Label
-		$objGroupBoxHashrateLabelTotalUnits2.Location = New-Object System.Drawing.Size(215,45)
-		$objGroupBoxHashrateLabelTotalUnits2.Size = New-Object System.Drawing.Size(40,20)
-		$objGroupBoxHashrateLabelTotalUnits2.Text = "[H/s]"
-		$objGroupBoxHashrateLabelTotalUnits2.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxHashrateLabelTotalUnits2.BackColor = "Transparent"
-		$objGroupBoxHashrate.Controls.Add($objGroupBoxHashrateLabelTotalUnits2)
+	$objTabPageOptions = New-Object System.Windows.Forms.TabPage
+	$objTabPageOptions.TabIndex = 1
+	$objTabPageOptions.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageOptionsHorizontalPosition"],$FormDimensions["objTabPageOptionsVerticalPosition"])
+	$objTabPageOptions.Size = New-Object System.Drawing.Size($FormDimensions["objTabPageOptionsWidth"],$FormDimensions["objTabPageOptionsHeight"])
+	$objTabPageOptions.Padding = "0, 0, 0, 0"
+	$objTabPageOptions.Text = "Options"
+	$objTabControl.Controls.Add($objTabPageOptions)
 
-		$objGroupBoxHashrateLabelTotal3 = New-Object System.Windows.Forms.Label
-		$objGroupBoxHashrateLabelTotal3.Location = New-Object System.Drawing.Size(5,70)
-		$objGroupBoxHashrateLabelTotal3.Size = New-Object System.Drawing.Size(150,20)
-		$objGroupBoxHashrateLabelTotal3.Text = "Total (in 15 minutes):"
-		$objGroupBoxHashrateLabelTotal3.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxHashrateLabelTotal3.BackColor = "Transparent"
-		$objGroupBoxHashrate.Controls.Add($objGroupBoxHashrateLabelTotal3)
-		$objGroupBoxHashrateTextBoxTotal3 = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxHashrateTextBoxTotal3.Location = New-Object System.Drawing.Point(155,70)
-		$objGroupBoxHashrateTextBoxTotal3.Size = New-Object System.Drawing.Size(60,20)
-		$objGroupBoxHashrateTextBoxTotal3.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxHashrateTextBoxTotal3.ReadOnly = $True
-		$objGroupBoxHashrateTextBoxTotal3.TextAlign = "Center";
-		$objGroupBoxHashrateTextBoxTotal3.Text = ""
-		$objGroupBoxHashrate.Controls.Add($objGroupBoxHashrateTextBoxTotal3)
-		$objGroupBoxHashrateLabelTotalUnits3 = New-Object System.Windows.Forms.Label
-		$objGroupBoxHashrateLabelTotalUnits3.Location = New-Object System.Drawing.Size(215,70)
-		$objGroupBoxHashrateLabelTotalUnits3.Size = New-Object System.Drawing.Size(40,20)
-		$objGroupBoxHashrateLabelTotalUnits3.Text = "[H/s]"
-		$objGroupBoxHashrateLabelTotalUnits3.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxHashrateLabelTotalUnits3.BackColor = "Transparent"
-		$objGroupBoxHashrate.Controls.Add($objGroupBoxHashrateLabelTotalUnits3)
+	$objTabPageSettings = New-Object System.Windows.Forms.TabPage
+	$objTabPageSettings.TabIndex = 2
+	$objTabPageSettings.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageSettingsHorizontalPosition"],$FormDimensions["objTabPageSettingsVerticalPosition"])
+	$objTabPageSettings.Size = New-Object System.Drawing.Size($FormDimensions["objTabPageSettingsWidth"],$FormDimensions["objTabPageSettingsHeight"])
+	$objTabPageSettings.Padding = "0, 0, 0, 0"
+	$objTabPageSettings.Text = "Settings"
 
-		$objGroupBoxHashrateLabelHighest = New-Object System.Windows.Forms.Label
-		$objGroupBoxHashrateLabelHighest.Location = New-Object System.Drawing.Size(5,95)
-		$objGroupBoxHashrateLabelHighest.Size = New-Object System.Drawing.Size(150,20)
-		$objGroupBoxHashrateLabelHighest.Text = "Highest:"
-		$objGroupBoxHashrateLabelHighest.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxHashrateLabelHighest.BackColor = "Transparent"
-		$objGroupBoxHashrate.Controls.Add($objGroupBoxHashrateLabelHighest)
-		$objGroupBoxHashrateTextBoxHighest = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxHashrateTextBoxHighest.Location = New-Object System.Drawing.Point(155,95)
-		$objGroupBoxHashrateTextBoxHighest.Size = New-Object System.Drawing.Size(60,20)
-		$objGroupBoxHashrateTextBoxHighest.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxHashrateTextBoxHighest.ReadOnly = $True
-		$objGroupBoxHashrateTextBoxHighest.TextAlign = "Center";
-		$objGroupBoxHashrateTextBoxHighest.Text = ""
-		$objGroupBoxHashrate.Controls.Add($objGroupBoxHashrateTextBoxHighest)
-		$objGroupBoxHashrateLabelHighestUnits = New-Object System.Windows.Forms.Label
-		$objGroupBoxHashrateLabelHighestUnits.Location = New-Object System.Drawing.Size(215,95)
-		$objGroupBoxHashrateLabelHighestUnits.Size = New-Object System.Drawing.Size(40,20)
-		$objGroupBoxHashrateLabelHighestUnits.Text = "[H/s]"
-		$objGroupBoxHashrateLabelHighestUnits.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxHashrateLabelHighestUnits.BackColor = "Transparent"
-		$objGroupBoxHashrate.Controls.Add($objGroupBoxHashrateLabelHighestUnits)
+		$objTabPageSettingsGroupBoxUpdate = New-Object System.Windows.Forms.GroupBox
+		$objTabPageSettingsGroupBoxUpdate.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageSettingsUpdateHorizontalPosition"],$FormDimensions["objTabPageSettingsUpdateVerticalPosition"])
+		$objTabPageSettingsGroupBoxUpdate.Size = New-Object System.Drawing.Size($FormDimensions["objTabPageSettingsUpdateWidth"],$FormDimensions["objTabPageSettingsUpdateHeight"])
+		$objTabPageSettingsGroupBoxUpdate.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
+		$objTabPageSettingsGroupBoxUpdate.Text = "Update every:"
 
-		$objGroupBoxHashrateThreads = New-Object System.Windows.Forms.GroupBox
-		$objGroupBoxHashrateThreads.Location = New-Object System.Drawing.Point(360,10)
-		$objGroupBoxHashrateThreads.Size = New-Object System.Drawing.Size(260,115)
-		$objGroupBoxHashrateThreads.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxHashrateThreads.Text = "Threads:"
+			$objTabPageSettingsGroupBoxUpdateComboBoxDataSourceHours = New-Object System.Collections.Generic.List[System.Object]
+			$objTabPageSettingsGroupBoxUpdateComboBoxDataSourceMinutes = New-Object System.Collections.Generic.List[System.Object]
+			$objTabPageSettingsGroupBoxUpdateComboBoxDataSourceSeconds = New-Object System.Collections.Generic.List[System.Object]
+			For ($i = 0; $i -le 59 ; $i++) {
+				If ($i -le 23) {
+					$objTabPageSettingsGroupBoxUpdateComboBoxDataSourceHours.Add($i.ToString("00.##"))
+				}
+				$objTabPageSettingsGroupBoxUpdateComboBoxDataSourceMinutes.Add($i.ToString("00.##"))
+				$objTabPageSettingsGroupBoxUpdateComboBoxDataSourceSeconds.Add($i.ToString("00.##"))
+			}
 
-			$objGroupBoxHashrateListViewThreads = New-Object System.Windows.Forms.ListView
-			$objGroupBoxHashrateListViewThreads.Location = New-Object System.Drawing.Point(5,15)
-			$objGroupBoxHashrateListViewThreads.Size = New-Object System.Drawing.Size(255,95)
-			$objGroupBoxHashrateListViewThreads.View = [System.Windows.Forms.View]::Details
-			$objGroupBoxHashrateListViewThreads.Width = $objGroupBoxHashrateListViewThreads.ClientRectangle.Width
-			$objGroupBoxHashrateListViewThreads.Height = $objGroupBoxHashrateListViewThreads.ClientRectangle.Height
-			$objGroupBoxHashrateListViewThreads.Anchor = "Top, Left, Right, Bottom"
-			$objGroupBoxHashrateListViewThreads.Columns.Add("#", 20, "Center") | Out-Null
-			$objGroupBoxHashrateListViewThreads.Columns.Add("2,5s", 70, "Center") | Out-Null
-			$objGroupBoxHashrateListViewThreads.Columns.Add("60s", 70, "Center") | Out-Null
-			$objGroupBoxHashrateListViewThreads.Columns.Add("15m", 70, "Center") | Out-Null
-			$objGroupBoxHashrateThreads.Controls.Add($objGroupBoxHashrateListViewThreads)
-			$objGroupBoxHashrateListViewThreads.add_ColumnClick({SortListView $objGroupBoxHashrateListViewThreads $_.Column})
+			$objTabPageSettingsGroupBoxUpdateLabelTimeLeft = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxUpdateLabelTimeLeft.Location = New-Object System.Drawing.Size(5,20)
+			$objTabPageSettingsGroupBoxUpdateLabelTimeLeft.Size = New-Object System.Drawing.Size(100,20)
+			$objTabPageSettingsGroupBoxUpdateLabelTimeLeft.Text = "Next refresh in:"
+			$objTabPageSettingsGroupBoxUpdateLabelTimeLeft.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxUpdateLabelTimeLeft.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxUpdate.Controls.Add($objTabPageSettingsGroupBoxUpdateLabelTimeLeft)
+			$objTabPageSettingsGroupBoxUpdateTextBoxTimeLeft = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxUpdateTextBoxTimeLeft.Location = New-Object System.Drawing.Point(110,20)
+			$objTabPageSettingsGroupBoxUpdateTextBoxTimeLeft.Size = New-Object System.Drawing.Size(40,20)
+			$objTabPageSettingsGroupBoxUpdateTextBoxTimeLeft.Cursor = [System.Windows.Forms.Cursors]::Default
+			$objTabPageSettingsGroupBoxUpdateTextBoxTimeLeft.ReadOnly = $True
+			$objTabPageSettingsGroupBoxUpdateTextBoxTimeLeft.TextAlign = "Center";
+			$objTabPageSettingsGroupBoxUpdateTextBoxTimeLeft.Text = ""
+			$objTabPageSettingsGroupBoxUpdate.Controls.Add($objTabPageSettingsGroupBoxUpdateTextBoxTimeLeft)
+			$objTabPageSettingsGroupBoxUpdateLabelTimeLeftUnits = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxUpdateLabelTimeLeftUnits.Location = New-Object System.Drawing.Size(150,20)
+			$objTabPageSettingsGroupBoxUpdateLabelTimeLeftUnits.Size = New-Object System.Drawing.Size(30,20)
+			$objTabPageSettingsGroupBoxUpdateLabelTimeLeftUnits.Text = "[s]"
+			$objTabPageSettingsGroupBoxUpdateLabelTimeLeftUnits.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxUpdateLabelTimeLeftUnits.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxUpdate.Controls.Add($objTabPageSettingsGroupBoxUpdateLabelTimeLeftUnits)
 
-		$objGroupBoxHashrate.Controls.Add($objGroupBoxHashrateThreads)
+			$objTabPageSettingsGroupBoxUpdateLabelTimeLeftUnits = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxUpdateLabelTimeLeftUnits.Location = New-Object System.Drawing.Size(180,20)
+			$objTabPageSettingsGroupBoxUpdateLabelTimeLeftUnits.Size = New-Object System.Drawing.Size(145,20)
+			$objTabPageSettingsGroupBoxUpdateLabelTimeLeftUnits.Text = "Change refresh period:"
+			$objTabPageSettingsGroupBoxUpdateLabelTimeLeftUnits.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxUpdateLabelTimeLeftUnits.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxUpdate.Controls.Add($objTabPageSettingsGroupBoxUpdateLabelTimeLeftUnits)
 
-	$objForm.Controls.Add($objGroupBoxHashrate)
+			$objTabPageSettingsGroupBoxUpdateComboBoxHours = New-Object System.Windows.Forms.ComboBox
+			$objTabPageSettingsGroupBoxUpdateComboBoxHours.Name = "UpdateComboBoxHours"
+			$objTabPageSettingsGroupBoxUpdateComboBoxHours.DataSource = $objTabPageSettingsGroupBoxUpdateComboBoxDataSourceHours
+			$objTabPageSettingsGroupBoxUpdateComboBoxHours.Location = New-Object System.Drawing.Point(330,20)
+			$objTabPageSettingsGroupBoxUpdateComboBoxHours.Size = New-Object System.Drawing.Size(40,20)
+			$objTabPageSettingsGroupBoxUpdateComboBoxHours.Add_SelectedIndexChanged({RefreshInterval $objTabPageSettingsGroupBoxUpdateComboBoxHours.SelectedItem $objTabPageSettingsGroupBoxUpdateComboBoxMinutes.SelectedItem $objTabPageSettingsGroupBoxUpdateComboBoxSeconds.SelectedItem})
+			$objTabPageSettingsGroupBoxUpdate.Controls.Add($objTabPageSettingsGroupBoxUpdateComboBoxHours)
+			$objTabPageSettingsGroupBoxUpdateLabelHours = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxUpdateLabelHours.Location = New-Object System.Drawing.Size(370,20)
+			$objTabPageSettingsGroupBoxUpdateLabelHours.Size = New-Object System.Drawing.Size(50,20)
+			$objTabPageSettingsGroupBoxUpdateLabelHours.Text = "Hours"
+			$objTabPageSettingsGroupBoxUpdateLabelHours.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxUpdateLabelHours.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxUpdate.Controls.Add($objTabPageSettingsGroupBoxUpdateLabelHours)
 
-	$objGroupBoxResults = New-Object System.Windows.Forms.GroupBox
-	$objGroupBoxResults.Location = New-Object System.Drawing.Point($objFormResultsHorizontalPosition,$objFormResultsVerticalPosition)
-	$objGroupBoxResults.Size = New-Object System.Drawing.Size($objFormResultsWidth,$objFormResultsHeight)
-	$objGroupBoxResults.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
-	$objGroupBoxResults.Text = "Results:"
+			$objTabPageSettingsGroupBoxUpdateComboBoxMinutes = New-Object System.Windows.Forms.ComboBox
+			$objTabPageSettingsGroupBoxUpdateComboBoxMinutes.Name = "UpdateComboBoxMinutes"
+			$objTabPageSettingsGroupBoxUpdateComboBoxMinutes.DataSource = $objTabPageSettingsGroupBoxUpdateComboBoxDataSourceMinutes
+			$objTabPageSettingsGroupBoxUpdateComboBoxMinutes.Location = New-Object System.Drawing.Point(420,20)
+			$objTabPageSettingsGroupBoxUpdateComboBoxMinutes.Size = New-Object System.Drawing.Size(40,20)
+			$objTabPageSettingsGroupBoxUpdateComboBoxMinutes.Add_SelectedIndexChanged({RefreshInterval $objTabPageSettingsGroupBoxUpdateComboBoxHours.SelectedItem $objTabPageSettingsGroupBoxUpdateComboBoxMinutes.SelectedItem $objTabPageSettingsGroupBoxUpdateComboBoxSeconds.SelectedItem})
+			$objTabPageSettingsGroupBoxUpdate.Controls.Add($objTabPageSettingsGroupBoxUpdateComboBoxMinutes)
+			$objTabPageSettingsGroupBoxUpdateLabelMinutes = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxUpdateLabelMinutes.Location = New-Object System.Drawing.Size(460,20)
+			$objTabPageSettingsGroupBoxUpdateLabelMinutes.Size = New-Object System.Drawing.Size(60,20)
+			$objTabPageSettingsGroupBoxUpdateLabelMinutes.Text = "Minutes"
+			$objTabPageSettingsGroupBoxUpdateLabelMinutes.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxUpdateLabelMinutes.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxUpdate.Controls.Add($objTabPageSettingsGroupBoxUpdateLabelMinutes)
 
-		$objGroupBoxResultsLabelHashes = New-Object System.Windows.Forms.Label
-		$objGroupBoxResultsLabelHashes.Location = New-Object System.Drawing.Size(5,20)
-		$objGroupBoxResultsLabelHashes.Size = New-Object System.Drawing.Size(55,20)
-		$objGroupBoxResultsLabelHashes.Text = "Hashes:"
-		$objGroupBoxResultsLabelHashes.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxResultsLabelHashes.BackColor = "Transparent"
-		$objGroupBoxResults.Controls.Add($objGroupBoxResultsLabelHashes)
-		$objGroupBoxResultsTextBoxHashes = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxResultsTextBoxHashes.Location = New-Object System.Drawing.Point(60,20)
-		$objGroupBoxResultsTextBoxHashes.Size = New-Object System.Drawing.Size(80,20)
-		$objGroupBoxResultsTextBoxHashes.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxResultsTextBoxHashes.ReadOnly = $True
-		$objGroupBoxResultsTextBoxHashes.TextAlign = "Center";
-		$objGroupBoxResultsTextBoxHashes.Text = ""
-		$objGroupBoxResults.Controls.Add($objGroupBoxResultsTextBoxHashes)
+			$objTabPageSettingsGroupBoxUpdateComboBoxSeconds = New-Object System.Windows.Forms.ComboBox
+			$objTabPageSettingsGroupBoxUpdateComboBoxSeconds.Name = "UpdateComboBoxSeconds"
+			$objTabPageSettingsGroupBoxUpdateComboBoxSeconds.DataSource = $objTabPageSettingsGroupBoxUpdateComboBoxDataSourceSeconds
+			$objTabPageSettingsGroupBoxUpdateComboBoxSeconds.Location = New-Object System.Drawing.Point(520,20)
+			$objTabPageSettingsGroupBoxUpdateComboBoxSeconds.Size = New-Object System.Drawing.Size(40,20)
+			$objTabPageSettingsGroupBoxUpdateComboBoxSeconds.Add_SelectedIndexChanged({RefreshInterval $objTabPageSettingsGroupBoxUpdateComboBoxHours.SelectedItem $objTabPageSettingsGroupBoxUpdateComboBoxMinutes.SelectedItem $objTabPageSettingsGroupBoxUpdateComboBoxSeconds.SelectedItem})
+			$objTabPageSettingsGroupBoxUpdate.Controls.Add($objTabPageSettingsGroupBoxUpdateComboBoxSeconds)
+			$objTabPageSettingsGroupBoxUpdateLabelSeconds = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxUpdateLabelSeconds.Location = New-Object System.Drawing.Size(560,20)
+			$objTabPageSettingsGroupBoxUpdateLabelSeconds.Size = New-Object System.Drawing.Size(60,20)
+			$objTabPageSettingsGroupBoxUpdateLabelSeconds.Text = "Seconds"
+			$objTabPageSettingsGroupBoxUpdateLabelSeconds.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxUpdateLabelSeconds.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxUpdate.Controls.Add($objTabPageSettingsGroupBoxUpdateLabelSeconds)
 
-		$objGroupBoxResultsLabelShares = New-Object System.Windows.Forms.Label
-		$objGroupBoxResultsLabelShares.Location = New-Object System.Drawing.Size(150,20)
-		$objGroupBoxResultsLabelShares.Size = New-Object System.Drawing.Size(135,20)
-		$objGroupBoxResultsLabelShares.Text = "Shares (total / good):"
-		$objGroupBoxResultsLabelShares.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxResultsLabelShares.BackColor = "Transparent"
-		$objGroupBoxResults.Controls.Add($objGroupBoxResultsLabelShares)
-		$objGroupBoxResultsTextBoxSharesTotal = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxResultsTextBoxSharesTotal.Location = New-Object System.Drawing.Point(290,20)
-		$objGroupBoxResultsTextBoxSharesTotal.Size = New-Object System.Drawing.Size(40,20)
-		$objGroupBoxResultsTextBoxSharesTotal.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxResultsTextBoxSharesTotal.ReadOnly = $True
-		$objGroupBoxResultsTextBoxSharesTotal.TextAlign = "Center";
-		$objGroupBoxResultsTextBoxSharesTotal.Text = ""
-		$objGroupBoxResults.Controls.Add($objGroupBoxResultsTextBoxSharesTotal)
-		$objGroupBoxResultsLabelSharesDelimeter = New-Object System.Windows.Forms.Label
-		$objGroupBoxResultsLabelSharesDelimeter.Location = New-Object System.Drawing.Size(330,20)
-		$objGroupBoxResultsLabelSharesDelimeter.Size = New-Object System.Drawing.Size(10,20)
-		$objGroupBoxResultsLabelSharesDelimeter.Text = "/"
-		$objGroupBoxResultsLabelSharesDelimeter.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxResultsLabelSharesDelimeter.BackColor = "Transparent"
-		$objGroupBoxResults.Controls.Add($objGroupBoxResultsLabelSharesDelimeter)
-		$objGroupBoxResultsTextBoxSharesGood = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxResultsTextBoxSharesGood.Location = New-Object System.Drawing.Point(340,20)
-		$objGroupBoxResultsTextBoxSharesGood.Size = New-Object System.Drawing.Size(40,20)
-		$objGroupBoxResultsTextBoxSharesGood.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxResultsTextBoxSharesGood.ReadOnly = $True
-		$objGroupBoxResultsTextBoxSharesGood.TextAlign = "Center";
-		$objGroupBoxResultsTextBoxSharesGood.Text = ""
-		$objGroupBoxResults.Controls.Add($objGroupBoxResultsTextBoxSharesGood)
+		$objTabPageSettings.Controls.Add($objTabPageSettingsGroupBoxUpdate)
 
-		$objGroupBoxResultsLabelTime = New-Object System.Windows.Forms.Label
-		$objGroupBoxResultsLabelTime.Location = New-Object System.Drawing.Size(390,20)
-		$objGroupBoxResultsLabelTime.Size = New-Object System.Drawing.Size(45,20)
-		$objGroupBoxResultsLabelTime.Text = "Time:"
-		$objGroupBoxResultsLabelTime.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxResultsLabelTime.BackColor = "Transparent"
-		$objGroupBoxResults.Controls.Add($objGroupBoxResultsLabelTime)
-		$objGroupBoxResultsTextBoxTime = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxResultsTextBoxTime.Location = New-Object System.Drawing.Point(435,20)
-		$objGroupBoxResultsTextBoxTime.Size = New-Object System.Drawing.Size(40,20)
-		$objGroupBoxResultsTextBoxTime.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxResultsTextBoxTime.ReadOnly = $True
-		$objGroupBoxResultsTextBoxTime.TextAlign = "Center";
-		$objGroupBoxResultsTextBoxTime.Text = ""
-		$objGroupBoxResults.Controls.Add($objGroupBoxResultsTextBoxTime)
+		$objTabPageSettingsGroupBoxManualConnection = New-Object System.Windows.Forms.GroupBox
+		$objTabPageSettingsGroupBoxManualConnection.Location = New-Object System.Drawing.Point($FormDimensions["objTabPageSettingsManualConnectionHorizontalPosition"],$FormDimensions["objTabPageSettingsManualConnectionVerticalPosition"])
+		$objTabPageSettingsGroupBoxManualConnection.Size = New-Object System.Drawing.Size($FormDimensions["objTabPageSettingsManualConnectionWidth"],$FormDimensions["objTabPageSettingsManualConnectionHeight"])
+		$objTabPageSettingsGroupBoxManualConnection.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
+		$objTabPageSettingsGroupBoxManualConnection.Text = "Manual connection:"
 
-		$objGroupBoxResultsLabelDifficulty = New-Object System.Windows.Forms.Label
-		$objGroupBoxResultsLabelDifficulty.Location = New-Object System.Drawing.Size(485,20)
-		$objGroupBoxResultsLabelDifficulty.Size = New-Object System.Drawing.Size(75,20)
-		$objGroupBoxResultsLabelDifficulty.Text = "Difficulty:"
-		$objGroupBoxResultsLabelDifficulty.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxResultsLabelDifficulty.BackColor = "Transparent"
-		$objGroupBoxResults.Controls.Add($objGroupBoxResultsLabelDifficulty)
-		$objGroupBoxResultsTextBoxDifficulty = New-Object System.Windows.Forms.TextBox
-		$objGroupBoxResultsTextBoxDifficulty.Location = New-Object System.Drawing.Point(560,20)
-		$objGroupBoxResultsTextBoxDifficulty.Size = New-Object System.Drawing.Size(60,20)
-		$objGroupBoxResultsTextBoxDifficulty.Cursor = [System.Windows.Forms.Cursors]::Default
-		$objGroupBoxResultsTextBoxDifficulty.ReadOnly = $True
-		$objGroupBoxResultsTextBoxDifficulty.TextAlign = "Center";
-		$objGroupBoxResultsTextBoxDifficulty.Text = ""
-		$objGroupBoxResults.Controls.Add($objGroupBoxResultsTextBoxDifficulty)
+			$objTabPageSettingsGroupBoxManualConnectionLabelAddress = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxManualConnectionLabelAddress.Location = New-Object System.Drawing.Size(5,20)
+			$objTabPageSettingsGroupBoxManualConnectionLabelAddress.Size = New-Object System.Drawing.Size(60,20)
+			$objTabPageSettingsGroupBoxManualConnectionLabelAddress.Text = "Address:"
+			$objTabPageSettingsGroupBoxManualConnectionLabelAddress.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxManualConnectionLabelAddress.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxManualConnection.Controls.Add($objTabPageSettingsGroupBoxManualConnectionLabelAddress)
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxAddress = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxAddress.Location = New-Object System.Drawing.Point(65,20)
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxAddress.Size = New-Object System.Drawing.Size(190,20)
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxAddress.ReadOnly = $False
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxAddress.TextAlign = "Left";
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxAddress.Text = ""
+			$objTabPageSettingsGroupBoxManualConnection.Controls.Add($objTabPageSettingsGroupBoxManualConnectionTextBoxAddress)
 
-		$objGroupBoxResultsTop10Shares = New-Object System.Windows.Forms.GroupBox
-		$objGroupBoxResultsTop10Shares.Location = New-Object System.Drawing.Point(5,45)
-		$objGroupBoxResultsTop10Shares.Size = New-Object System.Drawing.Size(615,60)
-		$objGroupBoxResultsTop10Shares.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxResultsTop10Shares.Text = "Top 10 Shares:"
+			$objTabPageSettingsGroupBoxManualConnectionLabelPort = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxManualConnectionLabelPort.Location = New-Object System.Drawing.Size(275,20)
+			$objTabPageSettingsGroupBoxManualConnectionLabelPort.Size = New-Object System.Drawing.Size(35,20)
+			$objTabPageSettingsGroupBoxManualConnectionLabelPort.Text = "Port:"
+			$objTabPageSettingsGroupBoxManualConnectionLabelPort.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxManualConnectionLabelPort.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxManualConnection.Controls.Add($objTabPageSettingsGroupBoxManualConnectionLabelPort)
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxPort = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxPort.Location = New-Object System.Drawing.Point(310,20)
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxPort.Size = New-Object System.Drawing.Size(50,20)
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxPort.ReadOnly = $False
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxPort.TextAlign = "Left";
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxPort.Text = ""
+			$objTabPageSettingsGroupBoxManualConnection.Controls.Add($objTabPageSettingsGroupBoxManualConnectionTextBoxPort)
 
-			$objGroupBoxResultsListViewTop10Shares = New-Object System.Windows.Forms.ListView
-			$objGroupBoxResultsListViewTop10Shares.Location = New-Object System.Drawing.Point(5,15)
-			$objGroupBoxResultsListViewTop10Shares.Size = New-Object System.Drawing.Size(610,45)
-			$objGroupBoxResultsListViewTop10Shares.View = [System.Windows.Forms.View]::Details
-			$objGroupBoxResultsListViewTop10Shares.Width = $objGroupBoxResultsListViewTop10Shares.ClientRectangle.Width
-			$objGroupBoxResultsListViewTop10Shares.Height = $objGroupBoxResultsListViewTop10Shares.ClientRectangle.Height
-			$objGroupBoxResultsListViewTop10Shares.Anchor = "Top, Left, Right, Bottom"
-			$objGroupBoxResultsListViewTop10Shares.Columns.Add("0", 0) | Out-Null
-			$objGroupBoxResultsListViewTop10Shares.Columns.Add("1", 60, "Center") | Out-Null
-			$objGroupBoxResultsListViewTop10Shares.Columns.Add("2", 60, "Center") | Out-Null
-			$objGroupBoxResultsListViewTop10Shares.Columns.Add("3", 60, "Center") | Out-Null
-			$objGroupBoxResultsListViewTop10Shares.Columns.Add("4", 60, "Center") | Out-Null
-			$objGroupBoxResultsListViewTop10Shares.Columns.Add("5", 60, "Center") | Out-Null
-			$objGroupBoxResultsListViewTop10Shares.Columns.Add("6", 60, "Center") | Out-Null
-			$objGroupBoxResultsListViewTop10Shares.Columns.Add("7", 60, "Center") | Out-Null
-			$objGroupBoxResultsListViewTop10Shares.Columns.Add("8", 60, "Center") | Out-Null
-			$objGroupBoxResultsListViewTop10Shares.Columns.Add("9", 60, "Center") | Out-Null
-			$objGroupBoxResultsListViewTop10Shares.Columns.Add("10", 60, "Center") | Out-Null
-			$objGroupBoxResultsTop10Shares.Controls.Add($objGroupBoxResultsListViewTop10Shares)
+			$objTabPageSettingsGroupBoxManualConnectionLabelProcess = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxManualConnectionLabelProcess.Location = New-Object System.Drawing.Size(380,20)
+			$objTabPageSettingsGroupBoxManualConnectionLabelProcess.Size = New-Object System.Drawing.Size(60,20)
+			$objTabPageSettingsGroupBoxManualConnectionLabelProcess.Text = "Process:"
+			$objTabPageSettingsGroupBoxManualConnectionLabelProcess.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxManualConnectionLabelProcess.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxManualConnection.Controls.Add($objTabPageSettingsGroupBoxManualConnectionLabelProcess)
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxProcess = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxProcess.Location = New-Object System.Drawing.Point(440,20)
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxProcess.Size = New-Object System.Drawing.Size(180,20)
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxProcess.ReadOnly = $False
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxProcess.TextAlign = "Left";
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxProcess.Text = ""
+			$objTabPageSettingsGroupBoxManualConnection.Controls.Add($objTabPageSettingsGroupBoxManualConnectionTextBoxProcess)
 
-		$objGroupBoxResults.Controls.Add($objGroupBoxResultsTop10Shares)
+			$objTabPageSettingsGroupBoxManualConnectionLabelToken = New-Object System.Windows.Forms.Label
+			$objTabPageSettingsGroupBoxManualConnectionLabelToken.Location = New-Object System.Drawing.Size(5,45)
+			$objTabPageSettingsGroupBoxManualConnectionLabelToken.Size = New-Object System.Drawing.Size(60,45)
+			$objTabPageSettingsGroupBoxManualConnectionLabelToken.Text = "Token:"
+			$objTabPageSettingsGroupBoxManualConnectionLabelToken.Font = New-Object System.Drawing.Font("Times New Roman",11,[System.Drawing.FontStyle]::Regular)
+			$objTabPageSettingsGroupBoxManualConnectionLabelToken.BackColor = "Transparent"
+			$objTabPageSettingsGroupBoxManualConnection.Controls.Add($objTabPageSettingsGroupBoxManualConnectionLabelToken)
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxToken = New-Object System.Windows.Forms.TextBox
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxToken.Location = New-Object System.Drawing.Point(65,45)
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxToken.Size = New-Object System.Drawing.Size(375,45)
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxToken.ReadOnly = $False
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxToken.TextAlign = "Left";
+			$objTabPageSettingsGroupBoxManualConnectionTextBoxToken.Text = ""
+			$objTabPageSettingsGroupBoxManualConnection.Controls.Add($objTabPageSettingsGroupBoxManualConnectionTextBoxToken)
 
-		$objGroupBoxResultsErrorLog = New-Object System.Windows.Forms.GroupBox
-		$objGroupBoxResultsErrorLog.Location = New-Object System.Drawing.Point(5,105)
-		$objGroupBoxResultsErrorLog.Size = New-Object System.Drawing.Size(615,100)
-		$objGroupBoxResultsErrorLog.Font = New-Object System.Drawing.Font("Times New Roman",10,[System.Drawing.FontStyle]::Regular)
-		$objGroupBoxResultsErrorLog.Visible = $FormFieldResultsErrorLogVisible
-		$objGroupBoxResultsErrorLog.Text = "Error log:"
+			$objTabPageSettingsGroupBoxManualConnectionButtonApply = New-Object System.Windows.Forms.Button
+			$objTabPageSettingsGroupBoxManualConnectionButtonApply.Location = New-Object System.Drawing.Point(450,45)
+			$objTabPageSettingsGroupBoxManualConnectionButtonApply.Text = "Apply"
+			$objTabPageSettingsGroupBoxManualConnectionButtonApply.Add_Click({
+				$Script:AddressCurrent = $objTabPageSettingsGroupBoxManualConnectionTextBoxAddress.Text
+				$Script:PortCurrent = $objTabPageSettingsGroupBoxManualConnectionTextBoxPort.Text
+				$Script:ProcessCurrent = $objTabPageSettingsGroupBoxManualConnectionTextBoxProcess.Text
+				$Script:TokenCurrent = $objTabPageSettingsGroupBoxManualConnectionTextBoxToken.Text
+				$Script:TryToReconnect = $True
+			})
+			$objTabPageSettingsGroupBoxManualConnection.Controls.Add($objTabPageSettingsGroupBoxManualConnectionButtonApply)
 
-			$objGroupBoxResultsListBoxErrorLog = New-Object System.Windows.Forms.ListBox
-			$objGroupBoxResultsListBoxErrorLog.Location = New-Object System.Drawing.Point(5,15)
-			$objGroupBoxResultsListBoxErrorLog.Size = New-Object System.Drawing.Size(605,80)
-			$objGroupBoxResultsErrorLog.Controls.Add($objGroupBoxResultsListBoxErrorLog)
+			$objTabPageSettingsGroupBoxManualConnectionButtonReset = New-Object System.Windows.Forms.Button
+			$objTabPageSettingsGroupBoxManualConnectionButtonReset.Location = New-Object System.Drawing.Point(540,45)
+			$objTabPageSettingsGroupBoxManualConnectionButtonReset.Text = "Reset"
+			$objTabPageSettingsGroupBoxManualConnectionButtonReset.Add_Click({
+				$Script:AddressCurrent = $Script:AddressDefault
+				$objTabPageSettingsGroupBoxManualConnectionTextBoxAddress.Text = $Script:AddressDefault
+				$Script:PortCurrent = $Script:PortDefault
+				$objTabPageSettingsGroupBoxManualConnectionTextBoxPort.Text = $Script:PortDefault
+				$Script:ProcessCurrent = $Script:ProcessDefault
+				$objTabPageSettingsGroupBoxManualConnectionTextBoxProcess.Text = $Script:ProcessDefault
+				$Script:TokenCurrent = $Script:TokenDefault
+				$objTabPageSettingsGroupBoxManualConnectionTextBoxToken.Text = $Script:TokenDefault
+				$Script:TryToReconnect = $True
+			})
+			$objTabPageSettingsGroupBoxManualConnection.Controls.Add($objTabPageSettingsGroupBoxManualConnectionButtonReset)
 
-		$objGroupBoxResults.Controls.Add($objGroupBoxResultsErrorLog)
+		$objTabPageSettings.Controls.Add($objTabPageSettingsGroupBoxManualConnection)
 
-	$objForm.Controls.Add($objGroupBoxResults)
+	$objTabControl.Controls.Add($objTabPageSettings)
+
+	$objForm.Controls.Add($objTabControl)
+
+	TabControl $objTabControl @($objTabPageMonitor, $objTabPageOptions) $False
+#	$objTabControl.SelectedIndex = 2
 
 	$objForm.KeyPreview = $True
+# Close form on "ESC" button:
 	$objForm.Add_KeyDown({If ($_.KeyCode -eq "Escape") {$objForm.Close()}})
+# Form is always on top:
+#	$objForm.Topmost = $False
 
-	$objForm.Topmost = $True
+	$objTimer.Start()
+	$objForm.Add_Load({
+		RefreshInterval ("{0:HH}" -f ([datetime]([timespan]::FromSeconds($Script:RefreshInterval)).Ticks)) ("{0:mm}" -f ([datetime]([timespan]::FromSeconds($Script:RefreshInterval)).Ticks)) ("{0:ss}" -f ([datetime]([timespan]::FromSeconds($Script:RefreshInterval)).Ticks))
+#		$objTabPageSettingsGroupBoxUpdateComboBoxHours.SelectedIndex = $objTabPageSettingsGroupBoxUpdateComboBoxHours.Items.IndexOf("{0:HH}" -f ([datetime]([timespan]::FromSeconds($Script:RefreshInterval)).Ticks))
+#		$objTabPageSettingsGroupBoxUpdateComboBoxMinutes.SelectedIndex = $objTabPageSettingsGroupBoxUpdateComboBoxMinutes.Items.IndexOf("{0:mm}" -f ([datetime]([timespan]::FromSeconds($Script:RefreshInterval)).Ticks))
+#		$objTabPageSettingsGroupBoxUpdateComboBoxSeconds.SelectedIndex = $objTabPageSettingsGroupBoxUpdateComboBoxSeconds.Items.IndexOf("{0:ss}" -f ([datetime]([timespan]::FromSeconds($Script:RefreshInterval)).Ticks))
+		$objTabPageSettingsGroupBoxManualConnectionTextBoxAddress.Text = $address
+		$objTabPageSettingsGroupBoxManualConnectionTextBoxPort.Text = $port
+		$objTabPageSettingsGroupBoxManualConnectionTextBoxProcess.Text = $process
+		$objTabPageSettingsGroupBoxManualConnectionTextBoxToken.Text = $token
+#		$objTimer.Enabled = $True
+#[System.Windows.Forms.MessageBox]::Show("SelectedIndex: " + $objTabControl.SelectedIndex)
+	})
+	$objForm.Add_Shown({$objForm.Activate()})
 
-	If (((Get-Process -name $process -ErrorAction SilentlyContinue).Responding) -eq $True) {
-		$ObjTimer.Start()
-		$objForm.Add_Load({
-			$objGroupBoxUpdateComboBoxHours.SelectedIndex = $objGroupBoxUpdateComboBoxHours.Items.IndexOf("{0:HH}" -f ([datetime]([timespan]::FromSeconds($Script:RefreshInterval)).Ticks))
-			$objGroupBoxUpdateComboBoxMinutes.SelectedIndex = $objGroupBoxUpdateComboBoxMinutes.Items.IndexOf("{0:mm}" -f ([datetime]([timespan]::FromSeconds($Script:RefreshInterval)).Ticks))
-			$objGroupBoxUpdateComboBoxSeconds.SelectedIndex = $objGroupBoxUpdateComboBoxSeconds.Items.IndexOf("{0:ss}" -f ([datetime]([timespan]::FromSeconds($Script:RefreshInterval)).Ticks))
-		})
-		$objForm.Add_Shown({$objForm.Activate()})
-		$objForm.ShowDialog() | Out-Null
-		$objForm.Close()
-		$ObjTimer.Stop()
-	} Else {
-		[System.Windows.Forms.MessageBox]::Show("ERROR: Process `"" + $process + "`" not loaded", "XMRig API Monitor", 0, [System.Windows.Forms.MessageBoxIcon]::Error) | out-null
-	}
+#	$objTabControl.Add_SelectedIndexChanged({[System.Windows.Forms.MessageBox]::Show("Index: " + ($objTabControl.SelectedTab).TabIndex + "; Text: " + ($objTabControl.SelectedTab).Text)})
+#	Start-Sleep -s 1
+	$objForm.ShowDialog() | Out-Null
+#	$objArray = $objForm.ShowDialog()
+	$objTimer.Stop()
+	$objForm.Close()
+
+#	Return $objArray
 }
 
-Show_Dialog $address $port $process $refresh
+Show_Dialog $address $port $token $process $refresh
